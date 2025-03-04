@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 
 import acaCalendar from './aca-calendar'
+import weather from './weather'
 
 export const app = new Hono()
   .use(cors({
@@ -13,6 +14,7 @@ export const app = new Hono()
     return c.text('Hello Hono!')
   })
   .route('/acacalendar', acaCalendar)
+  .route('/weather', weather)
   
 const port = parseInt(process.env.PORT!) || 3000
 

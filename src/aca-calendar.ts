@@ -24,6 +24,7 @@ export type CalendarApiResponse = {
 
 
 const app = new Hono()
+// we using bun, write test with bun:test
     .get('/',
         zValidator(
             'query',
