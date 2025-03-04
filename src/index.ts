@@ -4,6 +4,9 @@ import { logger } from 'hono/logger'
 
 import acaCalendar from './aca-calendar'
 import weather from './weather'
+import course from './course'
+import venue from './venue'
+import shortlink from './shortlink'
 
 export const app = new Hono()
   .use(cors({
@@ -15,6 +18,9 @@ export const app = new Hono()
   })
   .route('/acacalendar', acaCalendar)
   .route('/weather', weather)
+  .route('/course', course)
+  .route('/venue', venue)
+  .route('/shortlink', shortlink)
   
 const port = parseInt(process.env.PORT!) || 3000
 
