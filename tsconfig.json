@@ -6,10 +6,8 @@
     "strict": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "types": [
-      "bun-types"
-    ],
+    "types": ["bun-types"],
     "jsx": "react-jsx",
-    "jsxImportSource": "hono/jsx",
+    "jsxImportSource": "hono/jsx"
   }
 }

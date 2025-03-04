@@ -4,19 +4,41 @@ import { selectMinimalStr } from "./types/courses";
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import supabase from '../../src/config/supabase';
+import supabase from "../../src/config/supabase";
 import { env } from "hono/adapter";
 
 const app = new Hono()
-  .get('/:courseId',
+  .get(
+    "/",
     zValidator(
-      'param',
+      "query",
       z.object({
-        courseId: z.string(),
-      })
+        courses: z.string().array(),
+      }),
     ),
     async (c) => {
-      const { courseId } = c.req.valid('param');
+      const { courses } = c.req.valid("query");
+      const { data, error } = await supabase_server
+        .from("courses")
+        .select("*")
+        .in("raw_id", courses);
+      if (error) {
+        console.error(error);
+        throw new Error("Failed to fetch course data");
+      }
+      return c.json(data);
+    },
+  )
+  .get(
+    "/:courseId",
+    zValidator(
+      "param",
+      z.object({
+        courseId: z.string(),
+      }),
+    ),
+    async (c) => {
+      const { courseId } = c.req.valid("param");
       const { data, error } = await supabase_server
         .from("courses")
         .select("*")
@@ -25,36 +47,41 @@ const app = new Hono()
         throw new Error(error.message);
       }
       return c.json(data![0]);
-    }
+    },
   )
-  .get('/:courseId/syllabus',
+  .get(
+    "/:courseId/syllabus",
     zValidator(
-      'param',
+      "param",
       z.object({
         courseId: z.string(),
-      })
+      }),
     ),
     async (c) => {
-      const { courseId } = c.req.valid('param');
+      const { courseId } = c.req.valid("param");
 
       const { data, error } = await supabase_server
         .from("courses")
-        .select(`*, course_syllabus ( * ), course_scores ( * ), course_dates ( * )`)
+        .select(
+          `*, course_syllabus ( * ), course_scores ( * ), course_dates ( * )`,
+        )
         .eq("raw_id", courseId);
       if (error) {
         throw new Error(error.message);
       }
       return c.json(data![0]);
-    })
-  .get('/:courseId/minimal',
+    },
+  )
+  .get(
+    "/:courseId/minimal",
     zValidator(
-      'param',
+      "param",
       z.object({
         courseId: z.string(),
-      })
+      }),
     ),
     async (c) => {
-      const { courseId } = c.req.valid('param');
+      const { courseId } = c.req.valid("param");
       const { data, error } = await supabase_server
         .from("courses")
         .select(selectMinimalStr)
@@ -63,17 +90,22 @@ const app = new Hono()
         throw new Error(error.message);
       }
       return c.json(data![0]);
-    })
-  .get('/:courseId/ptt',
+    },
+  )
+  .get(
+    "/:courseId/ptt",
     zValidator(
-      'param',
+      "param",
       z.object({
         courseId: z.string(),
-      })
+      }),
     ),
     async (c) => {
-      const { courseId } = c.req.valid('param');
-      const { data, error } = await supabase_server.from("courses").select("*").eq("raw_id", courseId);
+      const { courseId } = c.req.valid("param");
+      const { data, error } = await supabase_server
+        .from("courses")
+        .select("*")
+        .eq("raw_id", courseId);
       if (error) {
         console.error(error);
         throw new Error("Failed to fetch course data");
@@ -97,9 +129,12 @@ const app = new Hono()
         for (const post_link of posts_link) {
           const link = post_link.querySelector(".title a");
           try {
-            const res = await fetch(`https://www.ptt.cc${link!.attributes.href}`, {
-              cache: "force-cache",
-            });
+            const res = await fetch(
+              `https://www.ptt.cc${link!.attributes.href}`,
+              {
+                cache: "force-cache",
+              },
+            );
             const html = await res.text();
             const root = parse(html);
             const post = root.querySelector("#main-content");
@@ -126,7 +161,10 @@ const app = new Hono()
 
 `;
 
-            const contentWithoutExcessiveText = content.replace(excessiveText, "");
+            const contentWithoutExcessiveText = content.replace(
+              excessiveText,
+              "",
+            );
 
             const date = post!.querySelectorAll(".article-meta-value")[3]?.text;
             const review = { content: contentWithoutExcessiveText, date };
@@ -140,53 +178,61 @@ const app = new Hono()
         console.error(error);
         throw new Error("Failed to fetch ptt data");
       }
-    })
-    .get('/:courseId/related',
-      zValidator(
-        'param',
-        z.object({
-          courseId: z.string(),
-        })
-      ),
-      async (c) => {
-        const { courseId } = c.req.valid('param');
-        const { data: dataCourse, error: courseError } = await supabase_server.from("courses").select("*").eq("raw_id", courseId);
-        if (courseError) {
-          console.error(courseError);
-          throw new Error("Failed to fetch course data");
-        }
-        const course = dataCourse![0];
-        const semester = parseInt(course.semester.substring(0, 3));
-        const getsemesters = [semester - 2, semester - 1, semester, semester + 1]
-          .map((s) => [s.toString() + "10", s.toString() + "20"])
-          .flat();
+    },
+  )
+  .get(
+    "/:courseId/related",
+    zValidator(
+      "param",
+      z.object({
+        courseId: z.string(),
+      }),
+    ),
+    async (c) => {
+      const { courseId } = c.req.valid("param");
+      const { data: dataCourse, error: courseError } = await supabase_server
+        .from("courses")
+        .select("*")
+        .eq("raw_id", courseId);
+      if (courseError) {
+        console.error(courseError);
+        throw new Error("Failed to fetch course data");
+      }
+      const course = dataCourse![0];
+      const semester = parseInt(course.semester.substring(0, 3));
+      const getsemesters = [semester - 2, semester - 1, semester, semester + 1]
+        .map((s) => [s.toString() + "10", s.toString() + "20"])
+        .flat();
 
-        const { data, error } = await supabase_server
-          .from("courses")
-          .select("*, course_scores(*)")
-          .eq("department", course.department)
-          .eq("course", course.course)
-          .eq("name_zh", course.name_zh) //due to the way the course ids are arranged, this is the best way to get the same course
-          .in("semester", getsemesters)
-          .not("raw_id", "eq", course.raw_id)
-          .order("raw_id", { ascending: false });
-        if (error) throw error;
-        if (!data) throw new Error("No data");
-        return c.json(data);
-      }
-    )
-    .get('/:courseId/syllabus/file', 
-      zValidator(
-        'param',
-        z.object({
-          courseId: z.string(),
-        })
-      ),
-      (c) => {
-        const { courseId } = c.req.valid('param');
-        const { SUPABASE_URL } = env<{ SUPABASE_URL: string }>(c);
-        return c.redirect(`${SUPABASE_URL}/storage/v1/object/public/syllabus/${encodeURIComponent(courseId)}.pdf`);
-      }
-    )
+      const { data, error } = await supabase_server
+        .from("courses")
+        .select("*, course_scores(*)")
+        .eq("department", course.department)
+        .eq("course", course.course)
+        .eq("name_zh", course.name_zh) //due to the way the course ids are arranged, this is the best way to get the same course
+        .in("semester", getsemesters)
+        .not("raw_id", "eq", course.raw_id)
+        .order("raw_id", { ascending: false });
+      if (error) throw error;
+      if (!data) throw new Error("No data");
+      return c.json(data);
+    },
+  )
+  .get(
+    "/:courseId/syllabus/file",
+    zValidator(
+      "param",
+      z.object({
+        courseId: z.string(),
+      }),
+    ),
+    (c) => {
+      const { courseId } = c.req.valid("param");
+      const { SUPABASE_URL } = env<{ SUPABASE_URL: string }>(c);
+      return c.redirect(
+        `${SUPABASE_URL}/storage/v1/object/public/syllabus/${encodeURIComponent(courseId)}.pdf`,
+      );
+    },
+  );
 
 export default app;
