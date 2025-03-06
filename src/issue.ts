@@ -187,7 +187,7 @@ const app = new Hono()
           },
         },
       );
-      const data = await response.json() as GithubIssue[];
+      const data = (await response.json()) as GithubIssue[];
       return c.json(data);
     },
   );
