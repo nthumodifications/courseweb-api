@@ -9,3 +9,7 @@ minify = true
 [dev]
 port = 5001
 local_protocol = "http"
+
+[observability]
+enabled = true
+head_sampling_rate = 1

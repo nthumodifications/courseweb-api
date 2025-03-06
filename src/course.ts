@@ -134,9 +134,7 @@ const app = new Hono()
         const searchTerm = encodeURI(
           `${course!.name_zh} ${course!.teacher_zh?.join(" ")}`,
         );
-        const res = await fetch(`${PTTWEBSITE}${searchTerm}`, {
-          cache: "force-cache",
-        });
+        const res = await fetch(`${PTTWEBSITE}${searchTerm}`);
         const html = await res.text();
         const root = parseHTML(html).document;
 
@@ -145,12 +143,7 @@ const app = new Hono()
         for (const post_link of posts_link) {
           const link = post_link.querySelector(".title a");
           try {
-            const res = await fetch(
-              `https://www.ptt.cc${link!.getAttribute("href")}`,
-              {
-                cache: "force-cache",
-              },
-            );
+            const res = await fetch(`https://www.ptt.cc${link!.getAttribute("href")}`);
             const html = await res.text();
             const root = parseHTML(html).document;
             const post = root.querySelector("#main-content");
