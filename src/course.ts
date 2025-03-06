@@ -29,11 +29,15 @@ const app = new Hono()
     zValidator(
       "query",
       z.object({
-        courses: z.string().array(),
+        //expect courses to be string if 1 item, array if multiple
+        courses: z.union([z.string(), z.array(z.string())]),
       }),
     ),
     async (c) => {
-      const { courses } = c.req.valid("query");
+      const { courses: _courses } = c.req.valid("query");
+
+      const courses = Array.isArray(_courses) ? _courses : [_courses];
+
       const { data, error } = await supabase_server(c)
         .from("courses")
         .select("*")
