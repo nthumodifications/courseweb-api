@@ -1,0 +1,11 @@
+name = "nthumods-api"
+main = "src/index.ts"
+compatibility_date = "2025-03-06"
+routes = [
+  { pattern = "api.nthumods.com", custom_domain = true }
+]
+minify = true
+
+[dev]
+port = 5001
+local_protocol = "http"

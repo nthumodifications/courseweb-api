@@ -1,5 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
+import { env } from "hono/adapter";
 import { z } from "zod";
 
 const endpoint = (key: string, accountID: string, namespaceID: string) =>
@@ -11,27 +12,37 @@ const app = new Hono()
     zValidator(
       "query",
       z.object({
-        url: z.string().url(),
+        url: z.string(),
       }),
     ),
     async (c) => {
       const { url } = c.req.valid("query");
+      console.log(url);
       // generate a random 16-character key
       const key = Array.from(
         { length: 16 },
         () => Math.random().toString(36)[2],
       ).join("");
 
+      const { 
+        CLOUDFLARE_WORKER_ACCOUNT_ID, 
+        CLOUDFLARE_KV_SHORTLINKS_NAMESPACE, 
+        CLOUDFLARE_KV_API_TOKEN 
+      } = env<{
+        CLOUDFLARE_WORKER_ACCOUNT_ID: string;
+        CLOUDFLARE_KV_SHORTLINKS_NAMESPACE: string;
+        CLOUDFLARE_KV_API_TOKEN: string;
+      }>(c);
       const res = await fetch(
         endpoint(
           key,
-          process.env.CLOUDFLARE_WORKER_ACCOUNT_ID!,
-          process.env.CLOUDFLARE_KV_SHORTLINKS_NAMESPACE!,
+          CLOUDFLARE_WORKER_ACCOUNT_ID,
+          CLOUDFLARE_KV_SHORTLINKS_NAMESPACE
         ),
         {
           method: "PUT",
           headers: {
-            Authorization: `Bearer ${process.env.CLOUDFLARE_KV_API_TOKEN}`,
+            Authorization: `Bearer ${CLOUDFLARE_KV_API_TOKEN}`,
             "Content-Type": "application/json",
           },
           body: url,
@@ -55,16 +66,25 @@ const app = new Hono()
     ),
     async (c) => {
       const { key } = c.req.valid("param");
+      const { 
+        CLOUDFLARE_WORKER_ACCOUNT_ID, 
+        CLOUDFLARE_KV_SHORTLINKS_NAMESPACE, 
+        CLOUDFLARE_KV_API_TOKEN 
+      } = env<{
+        CLOUDFLARE_WORKER_ACCOUNT_ID: string;
+        CLOUDFLARE_KV_SHORTLINKS_NAMESPACE: string;
+        CLOUDFLARE_KV_API_TOKEN: string;
+      }>(c);
       const text = await fetch(
         endpoint(
           key,
-          process.env.CLOUDFLARE_WORKER_ACCOUNT_ID!,
-          process.env.CLOUDFLARE_KV_SHORTLINKS_NAMESPACE!,
+          CLOUDFLARE_WORKER_ACCOUNT_ID!,
+          CLOUDFLARE_KV_SHORTLINKS_NAMESPACE!,
         ),
         {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${process.env.CLOUDFLARE_KV_API_TOKEN}`,
+            Authorization: `Bearer ${CLOUDFLARE_KV_API_TOKEN}`,
             "Content-Type": "text/plain",
           },
         },

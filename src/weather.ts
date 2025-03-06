@@ -1,8 +1,6 @@
 import { Hono } from "hono";
 import { format } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import { zValidator } from "@hono/zod-validator";
-import { z } from "zod";
 import { env } from "hono/adapter";
 import { getRangeOfDays } from "./utils/dates";
 

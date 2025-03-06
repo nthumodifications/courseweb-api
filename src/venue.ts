@@ -5,17 +5,17 @@ import { z } from "zod";
 
 const app = new Hono()
   .get("/", async (c) => {
-    const { data, error } = await supabase_server
-      .from("distinct_classes")
-      .select("class");
+    const { data, error } = await supabase_server(c)
+      .from("distinct_venues")
+      .select("*");
     if (error) {
       console.error(error);
       throw new Error("Failed to fetch classes");
     }
-    const filteredData = data.filter((item: any) => item.class !== null) as {
-      class: string;
+    const filteredData = data.filter((item) => item.venue !== null) as {
+      venue: string;
     }[];
-    return c.json(filteredData.map((item) => item.class));
+    return c.json(filteredData.map((item) => item.venue));
   })
   .get(
     "/:venueId/courses",
@@ -34,7 +34,7 @@ const app = new Hono()
     async (c) => {
       const { venueId } = c.req.valid("param");
       const { semester } = c.req.valid("query");
-      const { data, error } = await supabase_server
+      const { data, error } = await supabase_server(c)
         .from("courses")
         .select("*")
         .eq("semester", semester)
