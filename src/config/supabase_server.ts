@@ -11,10 +11,7 @@ const supabase_server = (c: Context) => {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error("Supabase credentials not found");
   }
-  return createClient<Database>(
-    SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY,
-  );
-}
+  return createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+};
 
 export default supabase_server;

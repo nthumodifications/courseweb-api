@@ -182,7 +182,8 @@ const app = new Hono()
               "",
             );
 
-            const date = post!.querySelectorAll(".article-meta-value")[3]?.textContent;
+            const date = post!.querySelectorAll(".article-meta-value")[3]
+              ?.textContent;
             const review = { content: contentWithoutExcessiveText, date };
             reviews.push(review);
           } catch (error) {

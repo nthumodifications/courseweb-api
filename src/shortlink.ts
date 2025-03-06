@@ -24,10 +24,10 @@ const app = new Hono()
         () => Math.random().toString(36)[2],
       ).join("");
 
-      const { 
-        CLOUDFLARE_WORKER_ACCOUNT_ID, 
-        CLOUDFLARE_KV_SHORTLINKS_NAMESPACE, 
-        CLOUDFLARE_KV_API_TOKEN 
+      const {
+        CLOUDFLARE_WORKER_ACCOUNT_ID,
+        CLOUDFLARE_KV_SHORTLINKS_NAMESPACE,
+        CLOUDFLARE_KV_API_TOKEN,
       } = env<{
         CLOUDFLARE_WORKER_ACCOUNT_ID: string;
         CLOUDFLARE_KV_SHORTLINKS_NAMESPACE: string;
@@ -37,7 +37,7 @@ const app = new Hono()
         endpoint(
           key,
           CLOUDFLARE_WORKER_ACCOUNT_ID,
-          CLOUDFLARE_KV_SHORTLINKS_NAMESPACE
+          CLOUDFLARE_KV_SHORTLINKS_NAMESPACE,
         ),
         {
           method: "PUT",
@@ -66,10 +66,10 @@ const app = new Hono()
     ),
     async (c) => {
       const { key } = c.req.valid("param");
-      const { 
-        CLOUDFLARE_WORKER_ACCOUNT_ID, 
-        CLOUDFLARE_KV_SHORTLINKS_NAMESPACE, 
-        CLOUDFLARE_KV_API_TOKEN 
+      const {
+        CLOUDFLARE_WORKER_ACCOUNT_ID,
+        CLOUDFLARE_KV_SHORTLINKS_NAMESPACE,
+        CLOUDFLARE_KV_API_TOKEN,
       } = env<{
         CLOUDFLARE_WORKER_ACCOUNT_ID: string;
         CLOUDFLARE_KV_SHORTLINKS_NAMESPACE: string;

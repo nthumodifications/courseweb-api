@@ -31,4 +31,4 @@ export const app = new Hono()
   .route("/ccxp", headlessAis)
   .route("/issue", issue);
 
-export default app
+export default app;
