@@ -70,7 +70,7 @@ const app = new Hono()
     zValidator(
       "param",
       z.object({
-        key: z.string().length(16),
+        key: z.string()
       }),
     ),
     async (c) => {
