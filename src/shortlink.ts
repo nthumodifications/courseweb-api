@@ -6,6 +6,16 @@ import { z } from "zod";
 const endpoint = (key: string, accountID: string, namespaceID: string) =>
   `https://api.cloudflare.com/client/v4/accounts/${accountID}/storage/kv/namespaces/${namespaceID}/values/${key}`;
 
+
+async function digest(message: string, algo = 'SHA-1') {
+  return Array.from(
+    new Uint8Array(
+      await crypto.subtle.digest(algo, new TextEncoder().encode(message))
+    ),
+    (byte) => byte.toString(16).padStart(2, '0')
+  ).join('');
+}
+
 const app = new Hono()
   .put(
     "/",
@@ -17,13 +27,8 @@ const app = new Hono()
     ),
     async (c) => {
       const { url } = c.req.valid("query");
-      console.log(url);
-      // generate a random 16-character key
-      const key = Array.from(
-        { length: 16 },
-        () => Math.random().toString(36)[2],
-      ).join("");
-
+      // use url md5 as key
+      const key = await digest(url)
       const {
         CLOUDFLARE_WORKER_ACCOUNT_ID,
         CLOUDFLARE_KV_SHORTLINKS_NAMESPACE,
@@ -33,12 +38,16 @@ const app = new Hono()
         CLOUDFLARE_KV_SHORTLINKS_NAMESPACE: string;
         CLOUDFLARE_KV_API_TOKEN: string;
       }>(c);
+      
+      // TTL: 2 months
+      const ttl = 60 * 60 * 24 * 30 * 2;
+      
       const res = await fetch(
         endpoint(
           key,
           CLOUDFLARE_WORKER_ACCOUNT_ID,
           CLOUDFLARE_KV_SHORTLINKS_NAMESPACE,
-        ),
+        )+`?expiration_ttl=${ttl}`,
         {
           method: "PUT",
           headers: {
