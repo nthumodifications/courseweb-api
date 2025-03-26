@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "wrangler dev src/index.ts",
     "deploy": "wrangler deploy src/index.ts",
-    "gentype": "npx supabase gen types typescript --project-id \"cmzdlrqfpuktcczvsobs\" --schema public > src/types/supabase.ts"
+    "gentype": "npx supabase gen types typescript --project-id \"cmzdlrqfpuktcczvsobs\" --schema public > src/types/supabase.ts",
+    "build": "tsc"
   },
   "dependencies": {
     "@cloudflare/workers-types": "^4.20250303.0",

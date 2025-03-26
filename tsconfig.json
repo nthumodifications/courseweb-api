@@ -8,6 +8,9 @@
     "skipLibCheck": true,
     "types": ["bun-types"],
     "jsx": "react-jsx",
-    "jsxImportSource": "hono/jsx"
+    "jsxImportSource": "hono/jsx",
+
+    "declaration": true,
+    "declarationDir": "./dist/types",
   }
 }
