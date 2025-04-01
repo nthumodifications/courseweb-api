@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'src/**' # Trigger when API source code changes
+      - "src/**" # Trigger when API source code changes
 
 jobs:
   sync-types:

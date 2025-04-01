@@ -147,7 +147,9 @@ const app = new Hono()
         for (const post_link of posts_link) {
           const link = post_link.querySelector(".title a");
           try {
-            const res = await fetch(`https://www.ptt.cc${link!.getAttribute("href")}`);
+            const res = await fetch(
+              `https://www.ptt.cc${link!.getAttribute("href")}`,
+            );
             const html = await res.text();
             const root = parseHTML(html).document;
             const post = root.querySelector("#main-content");
