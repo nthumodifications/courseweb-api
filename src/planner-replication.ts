@@ -255,10 +255,7 @@ const app = new Hono()
                 const user = c.get("user");
 
                 // Explicitly typing the result with IdCheckpoint for clarity
-                const result: {
-                    checkpoint: IdCheckpoint | null;
-                    documents: RxDocument<Prisma.FolderGetPayload<{}>>[];
-                } = await handlePullRequest<Prisma.FolderGetPayload<{}>, 'id'>(
+                const result = await handlePullRequest<Prisma.FolderGetPayload<{}>, 'id'>(
                     user.sub,
                     prisma.folder,
                     'id',
@@ -330,11 +327,7 @@ const app = new Hono()
                 const params = c.req.valid("query");
                 const user = c.get("user");
 
-                // Explicitly typing the result with UuidCheckpoint for clarity
-                const result: {
-                    checkpoint: UuidCheckpoint | null;
-                    documents: RxDocument<Prisma.ItemGetPayload<{}>>[];
-                } = await handlePullRequest<Prisma.ItemGetPayload<{}>, 'uuid'>(
+                const result = await handlePullRequest<Prisma.ItemGetPayload<{}>, 'uuid'>(
                     user.sub,
                     prisma.item,
                     'uuid',
@@ -406,7 +399,7 @@ const app = new Hono()
                 const params = c.req.valid("query");
                 const user = c.get("user");
 
-                const result = await handlePullRequest<Prisma.PlannerDataGetPayload<{}>>(
+                const result = await handlePullRequest<Prisma.PlannerDataGetPayload<{}>, 'id'>(
                     user.sub,
                     prisma.plannerData,
                     'id',
@@ -478,7 +471,7 @@ const app = new Hono()
                 const params = c.req.valid("query");
                 const user = c.get("user");
 
-                const result = await handlePullRequest<Prisma.SemesterGetPayload<{}>>(
+                const result = await handlePullRequest<Prisma.SemesterGetPayload<{}>, 'id'>(
                     user.sub,
                     prisma.semester,
                     'id',
