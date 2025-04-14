@@ -3,20 +3,60 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { auth } from "./utils/auth";
 import { ensureNotFalsy, lastOfArray, type RxReplicationWriteToMasterRow } from "rxdb/plugins/core";
-import { PrismaClient } from "./generated/client";
+import { PrismaClient, Prisma } from "./generated/client";
 import { deepCompare } from "./utils/deepCompare";
 import { HTTPException } from 'hono/http-exception'
 
 // Initialize Prisma client
 const prisma = new PrismaClient();
 
+// Define models with different ID fields
+type BaseModel = {
+    serverTimestamp: Date;
+    userId: string;
+    deleted: boolean;
+};
+
+type IdModel = BaseModel & {
+    id: string;
+};
+
+type UuidModel = BaseModel & {
+    uuid: string;
+};
+
+// The Model type can be either IdModel or UuidModel
+type Model = IdModel | UuidModel;
+
+// Define a helper type to transform Prisma models to RxDB documents
+type RxDocument<T> = Omit<T, 'userId' | 'serverTimestamp' | 'deleted'> & { _deleted: boolean };
+
+// Define checkpoint types based on idField
+type IdCheckpoint = {
+    id: string;
+    serverTimestamp: string;
+};
+
+type UuidCheckpoint = {
+    uuid: string;
+    serverTimestamp: string;
+};
+
+// Conditional type to select the right checkpoint based on idField
+type Checkpoint<T extends 'id' | 'uuid'> = T extends 'id' ? IdCheckpoint : UuidCheckpoint;
+
 /**
  * Generic function to handle pull operations for any collection
+ * @template M The specific model type (with either id or uuid required)
+ * @template IdField The ID field type ('id' or 'uuid')
  */
-async function handlePullRequest<T extends { id?: string, uuid?: string, serverTimestamp?: Date, userId?: string, deleted?: boolean }>(
+async function handlePullRequest<
+    M extends Model,
+    IdField extends 'id' | 'uuid' = 'id' | 'uuid'
+>(
     userId: string | undefined,
     collection: any,
-    idField: 'id' | 'uuid',
+    idField: IdField,
     queryParams: {
         id?: string,
         uuid?: string,
@@ -24,7 +64,10 @@ async function handlePullRequest<T extends { id?: string, uuid?: string, serverT
         batchSize?: number
     },
     orderBy: Array<{ [key: string]: 'asc' | 'desc' }>
-) {
+): Promise<{
+    checkpoint: Checkpoint<IdField> | null;
+    documents: RxDocument<M>[];
+}> {
     if (!userId) {
         throw new Error("User ID is required");
     }
@@ -68,13 +111,13 @@ async function handlePullRequest<T extends { id?: string, uuid?: string, serverT
 
     if (items.length === 0) {
         return {
-            checkpoint: lastPulledTimestamp ? { [idField]: id, serverTimestamp } : null,
+            checkpoint: lastPulledTimestamp ? { [idField]: id || "", serverTimestamp: lastPulledTimestamp.toISOString() } as Checkpoint<IdField> : null,
             documents: []
         };
     }
 
-    const lastDoc = ensureNotFalsy(lastOfArray(items)) as T;
-    const documents = items.map((item: T) => {
+    const lastDoc = ensureNotFalsy(lastOfArray(items)) as M;
+    const documents = items.map((item: M) => {
         const { userId, serverTimestamp, deleted, ...itemData } = item;
         // Map deleted field to _deleted for RxDB
         return {
@@ -84,9 +127,9 @@ async function handlePullRequest<T extends { id?: string, uuid?: string, serverT
     });
 
     const newCheckpoint = {
-        [idField]: lastDoc[idField as keyof T] as string,
+        [idField]: lastDoc[idField as unknown as keyof M] as string,
         serverTimestamp: (lastDoc.serverTimestamp as Date).toISOString()
-    };
+    } as Checkpoint<IdField>;
 
     return {
         documents,
@@ -96,25 +139,26 @@ async function handlePullRequest<T extends { id?: string, uuid?: string, serverT
 
 /**
  * Generic function to handle push operations for any collection
+ * @template M The specific model type (with either id or uuid required)
  */
-async function handlePushRequest<T extends Record<string, any>>(
+async function handlePushRequest<M extends Model>(
     userId: string | undefined,
     collection: any,
     idField: 'id' | 'uuid',
-    rows: RxReplicationWriteToMasterRow<T>[],
+    rows: RxReplicationWriteToMasterRow<RxDocument<IdModel | UuidModel>>[],
     uniqueConstraint: { [key: string]: string } | null = null
-) {
+): Promise<RxDocument<M>[]> {
     if (!userId) {
         throw new Error("User ID is required");
     }
 
-    const conflicts: (T & { _deleted?: boolean })[] = [];
+    const conflicts: RxDocument<M>[] = [];
 
     // Process each row in a transaction
     await prisma.$transaction(async (tx) => {
         for (const row of rows) {
             const { newDocumentState, assumedMasterState } = row;
-            const id = newDocumentState[idField];
+            const id = newDocumentState[idField as keyof typeof newDocumentState];
 
             // Build where clause for the unique constraint
             const whereClause = uniqueConstraint
@@ -142,7 +186,7 @@ async function handlePushRequest<T extends Record<string, any>>(
                 const itemDataForComparison = {
                     ...itemData,
                     _deleted: deleted || false
-                };
+                } as RxDocument<M>;
 
                 // If we have an assumed state but it doesn't match what's in the DB, it's a conflict
                 if (assumedMasterState && !deepCompare(itemDataForComparison, assumedMasterState)) {
@@ -183,7 +227,14 @@ async function handlePushRequest<T extends Record<string, any>>(
         }
     });
 
-    return conflicts;
+    // Ensure all conflicts have the _deleted property properly mapped from deleted
+    return conflicts.map(conflict => {
+        if ('deleted' in conflict) {
+            const { deleted, ...rest } = conflict;
+            return { ...rest, _deleted: deleted || false } as RxDocument<M>;
+        }
+        return conflict;
+    });
 }
 
 const app = new Hono()
@@ -203,7 +254,11 @@ const app = new Hono()
                 const params = c.req.valid("query");
                 const user = c.get("user");
 
-                const result = await handlePullRequest(
+                // Explicitly typing the result with IdCheckpoint for clarity
+                const result: {
+                    checkpoint: IdCheckpoint | null;
+                    documents: RxDocument<Prisma.FolderGetPayload<{}>>[];
+                } = await handlePullRequest<Prisma.FolderGetPayload<{}>, 'id'>(
                     user.sub,
                     prisma.folder,
                     'id',
@@ -245,7 +300,7 @@ const app = new Hono()
                 const rows = c.req.valid("json");
                 const user = c.get("user");
 
-                const conflicts = await handlePushRequest(
+                const conflicts = await handlePushRequest<Prisma.FolderGetPayload<{}>>(
                     user.sub,
                     prisma.folder,
                     'id',
@@ -275,7 +330,11 @@ const app = new Hono()
                 const params = c.req.valid("query");
                 const user = c.get("user");
 
-                const result = await handlePullRequest(
+                // Explicitly typing the result with UuidCheckpoint for clarity
+                const result: {
+                    checkpoint: UuidCheckpoint | null;
+                    documents: RxDocument<Prisma.ItemGetPayload<{}>>[];
+                } = await handlePullRequest<Prisma.ItemGetPayload<{}>, 'uuid'>(
                     user.sub,
                     prisma.item,
                     'uuid',
@@ -317,7 +376,7 @@ const app = new Hono()
                 const rows = c.req.valid("json");
                 const user = c.get("user");
 
-                const conflicts = await handlePushRequest(
+                const conflicts = await handlePushRequest<Prisma.ItemGetPayload<{}>>(
                     user.sub,
                     prisma.item,
                     'uuid',
@@ -347,7 +406,7 @@ const app = new Hono()
                 const params = c.req.valid("query");
                 const user = c.get("user");
 
-                const result = await handlePullRequest(
+                const result = await handlePullRequest<Prisma.PlannerDataGetPayload<{}>>(
                     user.sub,
                     prisma.plannerData,
                     'id',
@@ -389,7 +448,7 @@ const app = new Hono()
                 const rows = c.req.valid("json");
                 const user = c.get("user");
 
-                const conflicts = await handlePushRequest(
+                const conflicts = await handlePushRequest<Prisma.PlannerDataGetPayload<{}>>(
                     user.sub,
                     prisma.plannerData,
                     'id',
@@ -419,7 +478,7 @@ const app = new Hono()
                 const params = c.req.valid("query");
                 const user = c.get("user");
 
-                const result = await handlePullRequest(
+                const result = await handlePullRequest<Prisma.SemesterGetPayload<{}>>(
                     user.sub,
                     prisma.semester,
                     'id',
@@ -461,7 +520,7 @@ const app = new Hono()
                 const rows = c.req.valid("json");
                 const user = c.get("user");
 
-                const conflicts = await handlePushRequest(
+                const conflicts = await handlePushRequest<Prisma.SemesterGetPayload<{}>>(
                     user.sub,
                     prisma.semester,
                     'id',
