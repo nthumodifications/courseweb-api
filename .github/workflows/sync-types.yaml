@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "src/**" # Trigger when API source code changes
+  workflow_dispatch: # Add manual trigger
 
 jobs:
   sync-types:
