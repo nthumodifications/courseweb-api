@@ -1,5 +1,6 @@
 import type { Context, MiddlewareHandler, Next } from 'hono';
 import { env } from 'hono/adapter';
+import { HTTPException } from 'hono/http-exception';
 
 // Define User interface for type safety
 export interface User {
@@ -27,7 +28,9 @@ export const auth = (requiredScopes?: string[]): MiddlewareHandler => {
         const authHeader = c.req.header('Authorization');
 
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return c.json({ message: 'Unauthorized' }, 401);
+            throw new HTTPException(401, {
+                message: 'Unauthorized',
+            });
         }
 
         const token = authHeader.substring(7); // Remove "Bearer " prefix
@@ -45,7 +48,9 @@ export const auth = (requiredScopes?: string[]): MiddlewareHandler => {
 
             if (!introspectionUrl || !clientId || !clientSecret) {
                 console.error('Missing required environment variables for authentication');
-                return c.json({ message: 'Server configuration error' }, 500);
+                throw new HTTPException(500, {
+                    message: 'Internal Server Error',
+                });
             }
 
             // Call the introspection endpoint with Basic Auth
@@ -62,13 +67,17 @@ export const auth = (requiredScopes?: string[]): MiddlewareHandler => {
             });
 
             if (!response.ok) {
-                return c.json({ message: 'Failed to validate token' }, 401);
+                throw new HTTPException(401, {
+                    message: 'Invalid token',
+                });
             }
 
             const introspection: IntrospectionResponse = await response.json();
 
             if (!introspection.active) {
-                return c.json({ message: 'Expired or invalid token' }, 401);
+                throw new HTTPException(401, {
+                    message: 'Unauthorized',
+                });
             }
 
             // Create user object
@@ -93,7 +102,9 @@ export const auth = (requiredScopes?: string[]): MiddlewareHandler => {
             });
 
             if (!hasRequiredScope) {
-                return c.json({ message: 'Forbidden: Insufficient scopes' }, 403);
+                throw new HTTPException(403, {
+                    message: 'Forbidden',
+                });
             }
 
             // Set user information in the context for downstream handlers
@@ -102,7 +113,9 @@ export const auth = (requiredScopes?: string[]): MiddlewareHandler => {
             await next();
         } catch (error) {
             console.error('Authentication error:', error);
-            return c.json({ message: 'Authentication failed' }, 401);
+            throw new HTTPException(500, {
+                message: 'Internal Server Error',
+            });
         }
     };
 };
@@ -114,7 +127,10 @@ export const withUser = (): MiddlewareHandler => {
     return async (c: Context, next: Next) => {
         const user = c.get('user');
         if (!user) {
-            return c.json({ message: 'Unauthorized' }, 401);
+            throw new HTTPException(401, {
+                message: 'Unauthorized',
+            });
+
         }
 
         // Make user available as a property on the request

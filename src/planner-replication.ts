@@ -5,6 +5,7 @@ import { auth } from "./utils/auth";
 import { ensureNotFalsy, lastOfArray, type RxReplicationWriteToMasterRow } from "rxdb/plugins/core";
 import { PrismaClient } from "./generated/client";
 import { deepCompare } from "./utils/deepCompare";
+import { HTTPException } from 'hono/http-exception'
 
 // Initialize Prisma client
 const prisma = new PrismaClient();
@@ -213,7 +214,7 @@ const app = new Hono()
                 return c.json(result);
             } catch (error) {
                 console.error("Error in folders/pull:", error);
-                return c.json({ message: error instanceof Error ? error.message : 'Unknown error' }, 400);
+                throw new HTTPException(400, { message: error instanceof Error ? error.message : 'Unknown error' });
             }
         }
     )
@@ -255,7 +256,7 @@ const app = new Hono()
                 return c.json(conflicts);
             } catch (error) {
                 console.error("Error in folders/push:", error);
-                return c.json({ message: error instanceof Error ? error.message : 'Unknown error' }, 400);
+                throw new HTTPException(400, { message: error instanceof Error ? error.message : 'Unknown error' });
             }
         }
     )
@@ -285,7 +286,7 @@ const app = new Hono()
                 return c.json(result);
             } catch (error) {
                 console.error("Error in items/pull:", error);
-                return c.json({ message: error instanceof Error ? error.message : 'Unknown error' }, 400);
+                throw new HTTPException(400, { message: error instanceof Error ? error.message : 'Unknown error' });
             }
         }
     )
@@ -327,7 +328,7 @@ const app = new Hono()
                 return c.json(conflicts);
             } catch (error) {
                 console.error("Error in items/push:", error);
-                return c.json({ message: error instanceof Error ? error.message : 'Unknown error' }, 400);
+                throw new HTTPException(400, { message: error instanceof Error ? error.message : 'Unknown error' });
             }
         }
     )
@@ -357,7 +358,7 @@ const app = new Hono()
                 return c.json(result);
             } catch (error) {
                 console.error("Error in plannerdata/pull:", error);
-                return c.json({ message: error instanceof Error ? error.message : 'Unknown error' }, 400);
+                throw new HTTPException(400, { message: error instanceof Error ? error.message : 'Unknown error' });
             }
         }
     )
@@ -399,7 +400,7 @@ const app = new Hono()
                 return c.json(conflicts);
             } catch (error) {
                 console.error("Error in plannerdata/push:", error);
-                return c.json({ message: error instanceof Error ? error.message : 'Unknown error' }, 400);
+                throw new HTTPException(400, { message: error instanceof Error ? error.message : 'Unknown error' });
             }
         }
     )
@@ -429,7 +430,7 @@ const app = new Hono()
                 return c.json(result);
             } catch (error) {
                 console.error("Error in semesters/pull:", error);
-                return c.json({ message: error instanceof Error ? error.message : 'Unknown error' }, 400);
+                throw new HTTPException(400, { message: error instanceof Error ? error.message : 'Unknown error' });
             }
         }
     )
@@ -471,7 +472,7 @@ const app = new Hono()
                 return c.json(conflicts);
             } catch (error) {
                 console.error("Error in semesters/push:", error);
-                return c.json({ message: error instanceof Error ? error.message : 'Unknown error' }, 400);
+                throw new HTTPException(400, { message: error instanceof Error ? error.message : 'Unknown error' });
             }
         }
     );
