@@ -19,4 +19,6 @@ jobs:
         with:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          preCommands: |
+            bun run prisma:generate
           packageManager: bun

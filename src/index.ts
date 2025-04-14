@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
-import { csrf } from "hono/csrf";
 
 import acaCalendar from "./aca-calendar";
 import weather from "./weather";
@@ -10,6 +9,7 @@ import venue from "./venue";
 import shortlink from "./shortlink";
 import issue from "./issue";
 import headlessAis from "./headless-ais";
+import planner from "./planner-replication";
 
 export const app = new Hono()
   .use(
@@ -29,6 +29,7 @@ export const app = new Hono()
   .route("/venue", venue)
   .route("/shortlink", shortlink)
   .route("/ccxp", headlessAis)
-  .route("/issue", issue);
+  .route("/issue", issue)
+  .route("/planner", planner);
 
 export default app;
