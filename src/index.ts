@@ -10,8 +10,13 @@ import shortlink from "./shortlink";
 import issue from "./issue";
 import headlessAis from "./headless-ais";
 import planner from "./planner-replication";
+import type { D1Database } from "@cloudflare/workers-types";
 
-export const app = new Hono()
+export type Bindings = {
+  DB: D1Database
+}
+
+export const app = new Hono<{ Bindings: Bindings }>()
   .use(
     cors({
       origin:

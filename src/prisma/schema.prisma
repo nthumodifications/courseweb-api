@@ -7,12 +7,12 @@
 generator client {
   provider = "prisma-client-js"
   output = "../generated/client"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
 
 model Folder {
@@ -47,7 +47,7 @@ model Item {
   description  String?
   comments     String?
   instructor   String?
-  dependson    String[]
+  dependson    String?  // Store as JSON string
   order        Int
   serverTimestamp DateTime @updatedAt
   userId       String
@@ -63,7 +63,7 @@ model PlannerData {
   requiredCredits  Float
   enrollmentYear   String
   graduationYear   String
-  includedSemesters String[]
+  includedSemesters String    // Store as JSON string
   description      String?
   createdAt        DateTime
   updatedAt        DateTime

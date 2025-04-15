@@ -6,9 +6,8 @@ import { ensureNotFalsy, lastOfArray, type RxReplicationWriteToMasterRow } from 
 import { PrismaClient, Prisma } from "./generated/client";
 import { deepCompare } from "./utils/deepCompare";
 import { HTTPException } from 'hono/http-exception'
-
-// Initialize Prisma client
-const prisma = new PrismaClient();
+import type { Bindings } from './index';
+import prismaClients from "./prisma/client";
 
 // Define models with different ID fields
 type BaseModel = {
@@ -54,6 +53,7 @@ async function handlePullRequest<
     M extends Model,
     IdField extends 'id' | 'uuid' = 'id' | 'uuid'
 >(
+    prisma: PrismaClient,
     userId: string | undefined,
     collection: any,
     idField: IdField,
@@ -119,9 +119,25 @@ async function handlePullRequest<
     const lastDoc = ensureNotFalsy(lastOfArray(items)) as M;
     const documents = items.map((item: M) => {
         const { userId, serverTimestamp, deleted, ...itemData } = item;
+
+        // Create a copy of itemData for transformations
+        const transformedData = { ...itemData };
+
+        // Deserialize dependson if it exists (for Item model)
+        if ('dependson' in transformedData && typeof transformedData.dependson === 'string') {
+            transformedData.dependson = transformedData.dependson ?
+                JSON.parse(transformedData.dependson) : null;
+        }
+
+        // Deserialize includedSemesters if it exists (for PlannerData model)
+        if ('includedSemesters' in transformedData && typeof transformedData.includedSemesters === 'string') {
+            transformedData.includedSemesters = transformedData.includedSemesters ?
+                JSON.parse(transformedData.includedSemesters) : [];
+        }
+
         // Map deleted field to _deleted for RxDB
         return {
-            ...itemData,
+            ...transformedData,
             _deleted: deleted || false
         };
     });
@@ -142,6 +158,7 @@ async function handlePullRequest<
  * @template M The specific model type (with either id or uuid required)
  */
 async function handlePushRequest<M extends Model>(
+    prisma: PrismaClient,
     userId: string | undefined,
     collection: any,
     idField: 'id' | 'uuid',
@@ -154,10 +171,67 @@ async function handlePushRequest<M extends Model>(
 
     const conflicts: RxDocument<M>[] = [];
 
-    // Process each row in a transaction
-    await prisma.$transaction(async (tx) => {
+    // Process each row separately first to determine conflicts
+    for (const row of rows) {
+        const { newDocumentState, assumedMasterState } = row;
+        const id = newDocumentState[idField as keyof typeof newDocumentState];
+
+        // Build where clause for the unique constraint
+        const whereClause = uniqueConstraint
+            ? {
+                [uniqueConstraint.name]: {
+                    userId,
+                    [idField]: id
+                }
+            }
+            : {
+                [idField]: id,
+                userId
+            };
+
+        // Find the current state in the database
+        const itemInDb = await collection.findUnique({
+            where: whereClause
+        });
+
+        // Check for conflicts
+        if (itemInDb) {
+            const { userId, serverTimestamp, deleted, ...itemData } = itemInDb;
+
+            // Create a copy for transformations
+            const transformedData = { ...itemData };
+
+            // Deserialize JSON strings for comparison
+            if ('dependson' in transformedData && typeof transformedData.dependson === 'string') {
+                transformedData.dependson = transformedData.dependson ?
+                    JSON.parse(transformedData.dependson) : null;
+            }
+
+            if ('includedSemesters' in transformedData && typeof transformedData.includedSemesters === 'string') {
+                transformedData.includedSemesters = transformedData.includedSemesters ?
+                    JSON.parse(transformedData.includedSemesters) : [];
+            }
+
+            // Need to map deleted to _deleted for comparison with assumedMasterState
+            const itemDataForComparison = {
+                ...transformedData,
+                _deleted: deleted || false
+            } as RxDocument<M>;
+
+            // If we have an assumed state but it doesn't match what's in the DB, it's a conflict
+            if (assumedMasterState && !deepCompare(itemDataForComparison, assumedMasterState)) {
+                conflicts.push(itemDataForComparison);
+                continue;
+            }
+        }
+    }
+
+    // If there are no conflicts, process all rows in a batch transaction
+    if (conflicts.length === 0) {
+        const operations = [];
+
         for (const row of rows) {
-            const { newDocumentState, assumedMasterState } = row;
+            const { newDocumentState } = row;
             const id = newDocumentState[idField as keyof typeof newDocumentState];
 
             // Build where clause for the unique constraint
@@ -173,59 +247,57 @@ async function handlePushRequest<M extends Model>(
                     userId
                 };
 
-            // Find the current state in the database
-            const itemInDb = await collection.findUnique({
-                where: whereClause
-            });
-
-            // Check for conflicts
-            if (itemInDb) {
-                const { userId, serverTimestamp, deleted, ...itemData } = itemInDb;
-
-                // Need to map deleted to _deleted for comparison with assumedMasterState
-                const itemDataForComparison = {
-                    ...itemData,
-                    _deleted: deleted || false
-                } as RxDocument<M>;
-
-                // If we have an assumed state but it doesn't match what's in the DB, it's a conflict
-                if (assumedMasterState && !deepCompare(itemDataForComparison, assumedMasterState)) {
-                    conflicts.push(itemDataForComparison);
-                    continue;
-                }
-            }
-
             // Check if the document should be deleted
             if (newDocumentState._deleted) {
-                if (itemInDb) {
-                    // For a soft delete approach, update the deleted flag instead of deleting the record
-                    await collection.update({
+                operations.push(
+                    collection.update({
                         where: whereClause,
                         data: {
                             deleted: true,
                             serverTimestamp: new Date()
                         }
-                    });
-                }
+                    })
+                );
                 continue;
             }
 
             // Prepare data for create/update
             const { _deleted, ...itemData } = newDocumentState;
+
+            // Create a copy for transformations
+            const transformedData = { ...itemData };
+
+            // Serialize arrays/objects to JSON strings
+            if ('dependson' in transformedData && transformedData.dependson !== null &&
+                (Array.isArray(transformedData.dependson) || typeof transformedData.dependson === 'object')) {
+                transformedData.dependson = JSON.stringify(transformedData.dependson);
+            }
+
+            if ('includedSemesters' in transformedData && Array.isArray(transformedData.includedSemesters)) {
+                transformedData.includedSemesters = JSON.stringify(transformedData.includedSemesters);
+            }
+
             const data = {
-                ...itemData,
+                ...transformedData,
                 userId,
                 deleted: false, // Ensure deleted is set to false for non-delete operations
             };
 
-            // Create or update the item
-            await collection.upsert({
-                where: whereClause,
-                update: data,
-                create: data
-            });
+            // Add upsert operation to transaction
+            operations.push(
+                collection.upsert({
+                    where: whereClause,
+                    update: data,
+                    create: data
+                })
+            );
         }
-    });
+
+        // Execute all operations in a batch transaction
+        if (operations.length > 0) {
+            await prisma.$transaction(operations);
+        }
+    }
 
     // Ensure all conflicts have the _deleted property properly mapped from deleted
     return conflicts.map(conflict => {
@@ -237,7 +309,7 @@ async function handlePushRequest<M extends Model>(
     });
 }
 
-const app = new Hono()
+const app = new Hono<{ Bindings: Bindings }>()
     .use(auth(["planner"]))
     .get(
         "/folders/pull",
@@ -254,8 +326,11 @@ const app = new Hono()
                 const params = c.req.valid("query");
                 const user = c.get("user");
 
+                const prisma = await prismaClients.fetch(c.env.DB);
+
                 // Explicitly typing the result with IdCheckpoint for clarity
                 const result = await handlePullRequest<Prisma.FolderGetPayload<{}>, 'id'>(
+                    prisma,
                     user.sub,
                     prisma.folder,
                     'id',
@@ -297,7 +372,9 @@ const app = new Hono()
                 const rows = c.req.valid("json");
                 const user = c.get("user");
 
+                const prisma = await prismaClients.fetch(c.env.DB);
                 const conflicts = await handlePushRequest<Prisma.FolderGetPayload<{}>>(
+                    prisma,
                     user.sub,
                     prisma.folder,
                     'id',
@@ -327,7 +404,9 @@ const app = new Hono()
                 const params = c.req.valid("query");
                 const user = c.get("user");
 
+                const prisma = await prismaClients.fetch(c.env.DB);
                 const result = await handlePullRequest<Prisma.ItemGetPayload<{}>, 'uuid'>(
+                    prisma,
                     user.sub,
                     prisma.item,
                     'uuid',
@@ -369,7 +448,9 @@ const app = new Hono()
                 const rows = c.req.valid("json");
                 const user = c.get("user");
 
+                const prisma = await prismaClients.fetch(c.env.DB);
                 const conflicts = await handlePushRequest<Prisma.ItemGetPayload<{}>>(
+                    prisma,
                     user.sub,
                     prisma.item,
                     'uuid',
@@ -399,7 +480,9 @@ const app = new Hono()
                 const params = c.req.valid("query");
                 const user = c.get("user");
 
+                const prisma = await prismaClients.fetch(c.env.DB);
                 const result = await handlePullRequest<Prisma.PlannerDataGetPayload<{}>, 'id'>(
+                    prisma,
                     user.sub,
                     prisma.plannerData,
                     'id',
@@ -441,7 +524,9 @@ const app = new Hono()
                 const rows = c.req.valid("json");
                 const user = c.get("user");
 
+                const prisma = await prismaClients.fetch(c.env.DB);
                 const conflicts = await handlePushRequest<Prisma.PlannerDataGetPayload<{}>>(
+                    prisma,
                     user.sub,
                     prisma.plannerData,
                     'id',
@@ -471,7 +556,9 @@ const app = new Hono()
                 const params = c.req.valid("query");
                 const user = c.get("user");
 
+                const prisma = await prismaClients.fetch(c.env.DB);
                 const result = await handlePullRequest<Prisma.SemesterGetPayload<{}>, 'id'>(
+                    prisma,
                     user.sub,
                     prisma.semester,
                     'id',
@@ -513,7 +600,9 @@ const app = new Hono()
                 const rows = c.req.valid("json");
                 const user = c.get("user");
 
+                const prisma = await prismaClients.fetch(c.env.DB);
                 const conflicts = await handlePushRequest<Prisma.SemesterGetPayload<{}>>(
+                    prisma,
                     user.sub,
                     prisma.semester,
                     'id',

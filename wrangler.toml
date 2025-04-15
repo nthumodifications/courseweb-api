@@ -1,6 +1,7 @@
 name = "nthumods-api"
 main = "src/index.ts"
 compatibility_date = "2025-03-06"
+compatibility_flags = ["nodejs_compat"]
 routes = [
   { pattern = "api.nthumods.com", custom_domain = true }
 ]
@@ -13,3 +14,8 @@ local_protocol = "http"
 [observability]
 enabled = true
 head_sampling_rate = 1
+
+[[d1_databases]]
+binding = "DB"
+database_name = "data-d1"
+database_id = "c6b4c91d-35a1-4218-9226-a8ab217150fb"
