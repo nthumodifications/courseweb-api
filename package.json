@@ -4,9 +4,14 @@
   "scripts": {
     "dev": "wrangler dev src/index.ts",
     "deploy": "wrangler deploy src/index.ts",
-    "gentype": "npx supabase gen types typescript --project-id \"cmzdlrqfpuktcczvsobs\" --schema public > src/types/supabase.ts",
-    "prisma:generate": "npx prisma generate --schema ./src/prisma/schema.prisma",
-    "prisma:push": "npx prisma db push --schema ./src/prisma/schema.prisma",
+    "gentype": "bunx supabase gen types typescript --project-id \"cmzdlrqfpuktcczvsobs\" --schema public > src/types/supabase.ts",
+    "prisma:generate": "bunx prisma generate --schema ./src/prisma/schema.prisma",
+    "prisma:migrate": "bunx prisma migrate diff --schema ./src/prisma/schema.prisma",
+    "prisma:migration:create": "wrangler d1 migrations create data-d1 update_schema",
+    "prisma:migration:generate": "bun run generateMigration.js",
+    "prisma:migration:apply:local": "wrangler d1 migrations apply data-d1 --local",
+    "prisma:migration:apply:remote": "wrangler d1 migrations apply data-d1 --remote",
+    "wrangler:types": "bunx wrangler types",
     "build": "tsc"
   },
   "dependencies": {
