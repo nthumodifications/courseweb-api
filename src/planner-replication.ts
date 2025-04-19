@@ -301,29 +301,21 @@ const app = new Hono<{ Bindings: Bindings }>()
                         },
                         async processItems(userId, idField, items) {
                             const operations = items.map(item => {
-                                if (item.isDeleted) {
-                                    return prisma.folder.update({
-                                        where: { userId_id: { userId, id: item.id } },
-                                        data: {
-                                            deleted: true,
-                                            serverTimestamp: new Date()
-                                        }
-                                    });
-                                } else {
-                                    return prisma.folder.upsert({
-                                        where: { userId_id: { userId, id: item.id } },
-                                        update: {
-                                            ...item.data,
-                                            userId,
-                                            deleted: false
-                                        },
-                                        create: {
-                                            deleted: false,
-                                            userId,
-                                            ...item.data,
-                                        }
-                                    });
-                                }
+                                return prisma.folder.upsert({
+                                    where: { userId_id: { userId, id: item.id } },
+                                    update: {
+                                        ...item.data,
+                                        userId,
+                                        serverTimestamp: new Date(),
+                                        deleted: item.isDeleted
+                                    },
+                                    create: {
+                                        deleted: item.isDeleted,
+                                        userId,
+                                        serverTimestamp: new Date(),
+                                        ...item.data,
+                                    }
+                                });
                             });
 
                             await prisma.$transaction(operations);
@@ -450,42 +442,34 @@ const app = new Hono<{ Bindings: Bindings }>()
                     {
                         async findItem(userId, idField, uuid) {
                             return prisma.item.findUnique({
-                                where: { uuid, userId }
+                                where: { uuid: uuid, userId }
                             });
                         },
                         async processItems(userId, idField, items) {
                             const operations = items.map(item => {
-                                if (item.isDeleted) {
-                                    return prisma.item.update({
-                                        where: { uuid: item.id, userId },
-                                        data: {
-                                            deleted: true,
-                                            serverTimestamp: new Date()
-                                        }
-                                    });
-                                } else {
-                                    const data = { ...item.data };
+                                const data = { ...item.data };
 
-                                    // Serialize dependson if it exists
-                                    if ('dependson' in data && data.dependson !== null &&
-                                        (Array.isArray(data.dependson) || typeof data.dependson === 'object')) {
-                                        data.dependson = JSON.stringify(data.dependson);
-                                    }
-
-                                    return prisma.item.upsert({
-                                        where: { uuid: item.id, userId },
-                                        update: {
-                                            ...data,
-                                            userId,
-                                            deleted: false
-                                        },
-                                        create: {
-                                            ...data,
-                                            userId,
-                                            deleted: false
-                                        }
-                                    });
+                                // Serialize dependson if it exists
+                                if ('dependson' in data && data.dependson !== null &&
+                                    (Array.isArray(data.dependson) || typeof data.dependson === 'object')) {
+                                    data.dependson = JSON.stringify(data.dependson);
                                 }
+
+                                return prisma.item.upsert({
+                                    where: { uuid: item.id, userId },
+                                    update: {
+                                        ...data,
+                                        userId,
+                                        serverTimestamp: new Date(),
+                                        deleted: item.isDeleted
+                                    },
+                                    create: {
+                                        ...data,
+                                        userId,
+                                        serverTimestamp: new Date(),
+                                        deleted: item.isDeleted
+                                    }
+                                });
                             });
 
                             await prisma.$transaction(operations);
@@ -625,38 +609,30 @@ const app = new Hono<{ Bindings: Bindings }>()
                         },
                         async processItems(userId, idField, items) {
                             const operations = items.map(item => {
-                                if (item.isDeleted) {
-                                    return prisma.plannerData.update({
-                                        where: { userId_id: { userId, id: item.id } },
-                                        data: {
-                                            deleted: true,
-                                            serverTimestamp: new Date()
-                                        }
-                                    });
+                                const data = { ...item.data };
+
+                                // Serialize includedSemesters if it exists
+                                if ('includedSemesters' in data && Array.isArray(data.includedSemesters)) {
+                                    data.includedSemesters = JSON.stringify(data.includedSemesters);
                                 } else {
-                                    const data = { ...item.data };
-
-                                    // Serialize includedSemesters if it exists
-                                    if ('includedSemesters' in data && Array.isArray(data.includedSemesters)) {
-                                        data.includedSemesters = JSON.stringify(data.includedSemesters);
-                                    } else {
-                                        data.includedSemesters = JSON.stringify([]);
-                                    }
-
-                                    return prisma.plannerData.upsert({
-                                        where: { userId_id: { userId, id: item.id } },
-                                        update: {
-                                            ...data,
-                                            userId,
-                                            deleted: false
-                                        },
-                                        create: {
-                                            ...data,
-                                            userId,
-                                            deleted: false
-                                        }
-                                    });
+                                    data.includedSemesters = JSON.stringify([]);
                                 }
+
+                                return prisma.plannerData.upsert({
+                                    where: { userId_id: { userId, id: item.id } },
+                                    update: {
+                                        ...data,
+                                        userId,
+                                        serverTimestamp: new Date(),
+                                        deleted: item.isDeleted
+                                    },
+                                    create: {
+                                        ...data,
+                                        userId,
+                                        serverTimestamp: new Date(),
+                                        deleted: item.isDeleted
+                                    }
+                                });
                             });
 
                             await prisma.$transaction(operations);
@@ -791,29 +767,21 @@ const app = new Hono<{ Bindings: Bindings }>()
                         },
                         async processItems(userId, idField, items) {
                             const operations = items.map(item => {
-                                if (item.isDeleted) {
-                                    return prisma.semester.update({
-                                        where: { userId_id: { userId, id: item.id } },
-                                        data: {
-                                            deleted: true,
-                                            serverTimestamp: new Date()
-                                        }
-                                    });
-                                } else {
-                                    return prisma.semester.upsert({
-                                        where: { userId_id: { userId, id: item.id } },
-                                        update: {
-                                            ...item.data,
-                                            userId,
-                                            deleted: false
-                                        },
-                                        create: {
-                                            ...item.data,
-                                            userId,
-                                            deleted: false
-                                        }
-                                    });
-                                }
+                                return prisma.semester.upsert({
+                                    where: { userId_id: { userId, id: item.id } },
+                                    update: {
+                                        ...item.data,
+                                        userId,
+                                        serverTimestamp: new Date(),
+                                        deleted: item.isDeleted
+                                    },
+                                    create: {
+                                        ...item.data,
+                                        userId,
+                                        serverTimestamp: new Date(),
+                                        deleted: item.isDeleted
+                                    }
+                                });
                             });
 
                             await prisma.$transaction(operations);
