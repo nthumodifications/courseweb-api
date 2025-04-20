@@ -50,7 +50,7 @@ const app = new Hono().get("/", async (c) => {
   if (!res.ok) {
     throw new Error("Failed to fetch data " + res.status + (await res.text()));
   }
-  const apiResponse = await res.json() as any;
+  const apiResponse = (await res.json()) as any;
   if (apiResponse.success === false) {
     throw new Error("Failed to fetch data " + apiResponse.result);
   }

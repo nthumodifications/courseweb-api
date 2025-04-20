@@ -2,11 +2,15 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 import { auth } from "./utils/auth";
-import { ensureNotFalsy, lastOfArray, type RxReplicationWriteToMasterRow } from "rxdb/plugins/core";
+import {
+    ensureNotFalsy,
+    lastOfArray,
+    type RxReplicationWriteToMasterRow,
+} from "rxdb/plugins/core";
 import { PrismaClient, Prisma } from "./generated/client";
 import { deepCompare } from "./utils/deepCompare";
-import { HTTPException } from 'hono/http-exception'
-import type { Bindings } from './index';
+import { HTTPException } from "hono/http-exception";
+import type { Bindings } from "./index";
 import prismaClients from "./prisma/client";
 
 // Define models with different ID fields
@@ -26,7 +30,9 @@ type UuidModel = BaseModel & {
 
 type Model = IdModel | UuidModel;
 
-type RxDocument<T> = Omit<T, 'userId' | 'serverTimestamp' | 'deleted'> & { _deleted: boolean };
+type RxDocument<T> = Omit<T, "userId" | "serverTimestamp" | "deleted"> & {
+    _deleted: boolean;
+};
 
 type IdCheckpoint = {
     id: string;
@@ -38,20 +44,22 @@ type UuidCheckpoint = {
     serverTimestamp: string;
 };
 
-type Checkpoint<T extends 'id' | 'uuid'> = T extends 'id' ? IdCheckpoint : UuidCheckpoint;
+type Checkpoint<T extends "id" | "uuid"> = T extends "id"
+    ? IdCheckpoint
+    : UuidCheckpoint;
 
 type ModelDelegates = {
-    [K in Prisma.ModelName]: PrismaClient[Uncapitalize<K>]
-}
+    [K in Prisma.ModelName]: PrismaClient[Uncapitalize<K>];
+};
 
 // Define interfaces for the callbacks
-interface PullHandlers<M extends Model, IdField extends 'id' | 'uuid'> {
+interface PullHandlers<M extends Model, IdField extends "id" | "uuid"> {
     findItems: (
         userId: string,
         idField: IdField,
         id: string | undefined,
         lastPulledTimestamp: Date | null,
-        batchSize: number
+        batchSize: number,
     ) => Promise<M[]>;
     transformItemToDocument: (item: M) => RxDocument<M>;
 }
@@ -59,17 +67,17 @@ interface PullHandlers<M extends Model, IdField extends 'id' | 'uuid'> {
 interface PushHandlers<M extends Model> {
     findItem: (
         userId: string,
-        idField: 'id' | 'uuid',
-        id: string
+        idField: "id" | "uuid",
+        id: string,
     ) => Promise<M | null>;
     processItems: (
         userId: string,
-        idField: 'id' | 'uuid',
+        idField: "id" | "uuid",
         items: Array<{
             id: string;
             isDeleted: boolean;
-            data: Omit<M, 'userId' | 'deleted' | 'serverTimestamp'>;
-        }>
+            data: Omit<M, "userId" | "deleted" | "serverTimestamp">;
+        }>,
     ) => Promise<void>;
     transformItemToDocument: (item: M) => RxDocument<M>;
 }
@@ -81,17 +89,17 @@ interface PushHandlers<M extends Model> {
  */
 async function handlePullRequest<
     M extends Model,
-    IdField extends 'id' | 'uuid' = 'id' | 'uuid'
+    IdField extends "id" | "uuid" = "id" | "uuid",
 >(
     userId: string | undefined,
     idField: IdField,
     queryParams: {
-        id?: string,
-        uuid?: string,
-        serverTimestamp?: string,
-        batchSize?: number
+        id?: string;
+        uuid?: string;
+        serverTimestamp?: string;
+        batchSize?: number;
     },
-    handlers: PullHandlers<M, IdField>
+    handlers: PullHandlers<M, IdField>,
 ): Promise<{
     checkpoint: Checkpoint<IdField> | null;
     documents: RxDocument<M>[];
@@ -102,20 +110,27 @@ async function handlePullRequest<
 
     const id = queryParams[idField];
     const { serverTimestamp, batchSize = 10 } = queryParams;
-    const lastPulledTimestamp = serverTimestamp ? new Date(serverTimestamp) : null;
+    const lastPulledTimestamp = serverTimestamp
+        ? new Date(serverTimestamp)
+        : null;
 
     const items = await handlers.findItems(
         userId,
         idField,
         id,
         lastPulledTimestamp,
-        batchSize
+        batchSize,
     );
 
     if (items.length === 0) {
         return {
-            checkpoint: lastPulledTimestamp ? { [idField]: id || "", serverTimestamp: lastPulledTimestamp.toISOString() } as Checkpoint<IdField> : null,
-            documents: []
+            checkpoint: lastPulledTimestamp
+                ? ({
+                    [idField]: id || "",
+                    serverTimestamp: lastPulledTimestamp.toISOString(),
+                } as Checkpoint<IdField>)
+                : null,
+            documents: [],
         };
     }
 
@@ -124,12 +139,12 @@ async function handlePullRequest<
 
     const newCheckpoint = {
         [idField]: lastDoc[idField as unknown as keyof M] as string,
-        serverTimestamp: (lastDoc.serverTimestamp as Date).toISOString()
+        serverTimestamp: (lastDoc.serverTimestamp as Date).toISOString(),
     } as Checkpoint<IdField>;
 
     return {
         documents,
-        checkpoint: newCheckpoint
+        checkpoint: newCheckpoint,
     };
 }
 
@@ -139,9 +154,13 @@ async function handlePullRequest<
  */
 async function handlePushRequest<M extends Model>(
     userId: string | undefined,
-    idField: 'id' | 'uuid',
-    rows: RxReplicationWriteToMasterRow<RxDocument<(IdModel | UuidModel) & Omit<M, 'userId' | 'deleted' | 'serverTimestamp'>>>[],
-    handlers: PushHandlers<M>
+    idField: "id" | "uuid",
+    rows: RxReplicationWriteToMasterRow<
+        RxDocument<
+            (IdModel | UuidModel) & Omit<M, "userId" | "deleted" | "serverTimestamp">
+        >
+    >[],
+    handlers: PushHandlers<M>,
 ): Promise<RxDocument<M>[]> {
     if (!userId) {
         throw new Error("User ID is required");
@@ -151,20 +170,22 @@ async function handlePushRequest<M extends Model>(
     const itemsToProcess: Array<{
         id: string;
         isDeleted: boolean;
-        data: Omit<M, 'userId' | 'deleted' | 'serverTimestamp'>;
+        data: Omit<M, "userId" | "deleted" | "serverTimestamp">;
     }> = [];
 
     // Process each row separately first to determine conflicts
     for (const row of rows) {
         const { newDocumentState, assumedMasterState } = row;
         const idValue = newDocumentState[idField as keyof typeof newDocumentState];
-        if (typeof idValue !== 'string') {
-            throw new Error(`Expected ${idField} to be a string, but got ${typeof idValue}`);
+        if (typeof idValue !== "string") {
+            throw new Error(
+                `Expected ${idField} to be a string, but got ${typeof idValue}`,
+            );
         }
         const id = idValue;
 
         // Find the current state in the database
-        const itemInDb = await handlers.findItem(userId, idField, id)
+        const itemInDb = await handlers.findItem(userId, idField, id);
 
         // Check for conflicts
         if (itemInDb && assumedMasterState) {
@@ -182,7 +203,10 @@ async function handlePushRequest<M extends Model>(
         itemsToProcess.push({
             id,
             isDeleted: _deleted,
-            data: itemData as any as Omit<M, 'userId' | 'deleted' | 'serverTimestamp'>
+            data: itemData as any as Omit<
+                M,
+                "userId" | "deleted" | "serverTimestamp"
+            >,
         });
     }
 
@@ -204,7 +228,7 @@ const app = new Hono<{ Bindings: Bindings }>()
                 id: z.string(),
                 serverTimestamp: z.string(),
                 batchSize: z.coerce.number().optional(),
-            })
+            }),
         ),
         async (c) => {
             try {
@@ -212,54 +236,54 @@ const app = new Hono<{ Bindings: Bindings }>()
                 const user = c.get("user");
                 const prisma = await prismaClients.fetch(c.env.DB);
 
-                const result = await handlePullRequest<Prisma.FolderGetPayload<{}>, 'id'>(
-                    user.sub,
-                    'id',
-                    params,
-                    {
-                        async findItems(userId, idField, id, lastPulledTimestamp, batchSize) {
-                            if (lastPulledTimestamp) {
-                                return prisma.folder.findMany({
-                                    where: {
-                                        userId,
-                                        OR: [
-                                            {
-                                                serverTimestamp: {
-                                                    gt: lastPulledTimestamp
-                                                },
+                const result = await handlePullRequest<
+                    Prisma.FolderGetPayload<{}>,
+                    "id"
+                >(user.sub, "id", params, {
+                    async findItems(userId, idField, id, lastPulledTimestamp, batchSize) {
+                        if (lastPulledTimestamp) {
+                            return prisma.folder.findMany({
+                                where: {
+                                    userId,
+                                    OR: [
+                                        {
+                                            serverTimestamp: {
+                                                gt: lastPulledTimestamp,
                                             },
-                                            {
-                                                AND: [
-                                                    { serverTimestamp: lastPulledTimestamp },
-                                                    { id: { gt: id || "" } }
-                                                ]
-                                            }
-                                        ]
-                                    },
-                                    orderBy: [{ serverTimestamp: 'asc' }, { id: 'asc' }],
-                                    take: batchSize
-                                });
-                            } else {
-                                return prisma.folder.findMany({
-                                    where: { userId },
-                                    orderBy: [{ serverTimestamp: 'asc' }, { id: 'asc' }],
-                                    take: batchSize
-                                });
-                            }
-                        },
-                        transformItemToDocument(item) {
-                            const { userId, serverTimestamp, deleted, ...rest } = item;
-                            return { ...rest, _deleted: deleted || false };
+                                        },
+                                        {
+                                            AND: [
+                                                { serverTimestamp: lastPulledTimestamp },
+                                                { id: { gt: id || "" } },
+                                            ],
+                                        },
+                                    ],
+                                },
+                                orderBy: [{ serverTimestamp: "asc" }, { id: "asc" }],
+                                take: batchSize,
+                            });
+                        } else {
+                            return prisma.folder.findMany({
+                                where: { userId },
+                                orderBy: [{ serverTimestamp: "asc" }, { id: "asc" }],
+                                take: batchSize,
+                            });
                         }
-                    }
-                );
+                    },
+                    transformItemToDocument(item) {
+                        const { userId, serverTimestamp, deleted, ...rest } = item;
+                        return { ...rest, _deleted: deleted || false };
+                    },
+                });
 
                 return c.json(result);
             } catch (error) {
                 console.error("Error in folders/pull:", error);
-                throw new HTTPException(400, { message: error instanceof Error ? error.message : 'Unknown error' });
+                throw new HTTPException(400, {
+                    message: error instanceof Error ? error.message : "Unknown error",
+                });
             }
-        }
+        },
     )
     .post(
         "/folders/push",
@@ -276,12 +300,12 @@ const app = new Hono<{ Bindings: Bindings }>()
                     assumedMasterState: z
                         .object({
                             id: z.string(),
-                            _deleted: z.boolean()
+                            _deleted: z.boolean(),
                         })
                         .passthrough()
                         .optional(),
-                })
-            )
+                }),
+            ),
         ),
         async (c) => {
             try {
@@ -291,30 +315,35 @@ const app = new Hono<{ Bindings: Bindings }>()
 
                 const conflicts = await handlePushRequest<Prisma.FolderGetPayload<{}>>(
                     user.sub,
-                    'id',
-                    rows as RxReplicationWriteToMasterRow<RxDocument<IdModel & Omit<Prisma.FolderGetPayload<{}>, 'deleted' | 'serverTimestamp'>>>[],
+                    "id",
+                    rows as RxReplicationWriteToMasterRow<
+                        RxDocument<
+                            IdModel &
+                            Omit<Prisma.FolderGetPayload<{}>, "deleted" | "serverTimestamp">
+                        >
+                    >[],
                     {
                         async findItem(userId, idField, id) {
                             return prisma.folder.findUnique({
-                                where: { userId_id: { userId, id } }
+                                where: { userId_id: { userId, id } },
                             });
                         },
                         async processItems(userId, idField, items) {
-                            const operations = items.map(item => {
+                            const operations = items.map((item) => {
                                 return prisma.folder.upsert({
                                     where: { userId_id: { userId, id: item.id } },
                                     update: {
                                         ...item.data,
                                         userId,
                                         serverTimestamp: new Date(),
-                                        deleted: item.isDeleted
+                                        deleted: item.isDeleted,
                                     },
                                     create: {
                                         deleted: item.isDeleted,
                                         userId,
                                         serverTimestamp: new Date(),
                                         ...item.data,
-                                    }
+                                    },
                                 });
                             });
 
@@ -323,16 +352,18 @@ const app = new Hono<{ Bindings: Bindings }>()
                         transformItemToDocument(item) {
                             const { userId, serverTimestamp, deleted, ...rest } = item;
                             return { ...rest, _deleted: deleted || false };
-                        }
-                    }
+                        },
+                    },
                 );
 
                 return c.json(conflicts);
             } catch (error) {
                 console.error("Error in folders/push:", error);
-                throw new HTTPException(400, { message: error instanceof Error ? error.message : 'Unknown error' });
+                throw new HTTPException(400, {
+                    message: error instanceof Error ? error.message : "Unknown error",
+                });
             }
-        }
+        },
     )
     .get(
         "/items/pull",
@@ -342,7 +373,7 @@ const app = new Hono<{ Bindings: Bindings }>()
                 uuid: z.string(),
                 serverTimestamp: z.string(),
                 batchSize: z.coerce.number().optional(),
-            })
+            }),
         ),
         async (c) => {
             try {
@@ -350,62 +381,72 @@ const app = new Hono<{ Bindings: Bindings }>()
                 const user = c.get("user");
                 const prisma = await prismaClients.fetch(c.env.DB);
 
-                const result = await handlePullRequest<Prisma.ItemGetPayload<{}>, 'uuid'>(
-                    user.sub,
-                    'uuid',
-                    params,
-                    {
-                        async findItems(userId, idField, uuid, lastPulledTimestamp, batchSize) {
-                            if (lastPulledTimestamp) {
-                                return prisma.item.findMany({
-                                    where: {
-                                        userId,
-                                        OR: [
-                                            {
-                                                serverTimestamp: {
-                                                    gt: lastPulledTimestamp
-                                                },
+                const result = await handlePullRequest<
+                    Prisma.ItemGetPayload<{}>,
+                    "uuid"
+                >(user.sub, "uuid", params, {
+                    async findItems(
+                        userId,
+                        idField,
+                        uuid,
+                        lastPulledTimestamp,
+                        batchSize,
+                    ) {
+                        if (lastPulledTimestamp) {
+                            return prisma.item.findMany({
+                                where: {
+                                    userId,
+                                    OR: [
+                                        {
+                                            serverTimestamp: {
+                                                gt: lastPulledTimestamp,
                                             },
-                                            {
-                                                AND: [
-                                                    { serverTimestamp: lastPulledTimestamp },
-                                                    { uuid: { gt: uuid || "" } }
-                                                ]
-                                            }
-                                        ]
-                                    },
-                                    orderBy: [{ serverTimestamp: 'asc' }, { uuid: 'asc' }],
-                                    take: batchSize
-                                });
-                            } else {
-                                return prisma.item.findMany({
-                                    where: { userId },
-                                    orderBy: [{ serverTimestamp: 'asc' }, { uuid: 'asc' }],
-                                    take: batchSize
-                                });
-                            }
-                        },
-                        transformItemToDocument(item) {
-                            const { userId, serverTimestamp, deleted, ...rest } = item;
-                            const transformedData = { ...rest };
-
-                            // Deserialize dependson if it exists
-                            if ('dependson' in transformedData && typeof transformedData.dependson === 'string') {
-                                transformedData.dependson = transformedData.dependson ?
-                                    JSON.parse(transformedData.dependson) : null;
-                            }
-
-                            return { ...transformedData, _deleted: deleted || false };
+                                        },
+                                        {
+                                            AND: [
+                                                { serverTimestamp: lastPulledTimestamp },
+                                                { uuid: { gt: uuid || "" } },
+                                            ],
+                                        },
+                                    ],
+                                },
+                                orderBy: [{ serverTimestamp: "asc" }, { uuid: "asc" }],
+                                take: batchSize,
+                            });
+                        } else {
+                            return prisma.item.findMany({
+                                where: { userId },
+                                orderBy: [{ serverTimestamp: "asc" }, { uuid: "asc" }],
+                                take: batchSize,
+                            });
                         }
-                    }
-                );
+                    },
+                    transformItemToDocument(item) {
+                        const { userId, serverTimestamp, deleted, ...rest } = item;
+                        const transformedData = { ...rest };
+
+                        // Deserialize dependson if it exists
+                        if (
+                            "dependson" in transformedData &&
+                            typeof transformedData.dependson === "string"
+                        ) {
+                            transformedData.dependson = transformedData.dependson
+                                ? JSON.parse(transformedData.dependson)
+                                : null;
+                        }
+
+                        return { ...transformedData, _deleted: deleted || false };
+                    },
+                });
 
                 return c.json(result);
             } catch (error) {
                 console.error("Error in items/pull:", error);
-                throw new HTTPException(400, { message: error instanceof Error ? error.message : 'Unknown error' });
+                throw new HTTPException(400, {
+                    message: error instanceof Error ? error.message : "Unknown error",
+                });
             }
-        }
+        },
     )
     .post(
         "/items/push",
@@ -426,8 +467,8 @@ const app = new Hono<{ Bindings: Bindings }>()
                         })
                         .passthrough()
                         .optional(),
-                })
-            )
+                }),
+            ),
         ),
         async (c) => {
             try {
@@ -437,21 +478,30 @@ const app = new Hono<{ Bindings: Bindings }>()
 
                 const conflicts = await handlePushRequest<Prisma.ItemGetPayload<{}>>(
                     user.sub,
-                    'uuid',
-                    rows as RxReplicationWriteToMasterRow<RxDocument<UuidModel & Omit<Prisma.ItemGetPayload<{}>, 'deleted' | 'serverTimestamp'>>>[],
+                    "uuid",
+                    rows as RxReplicationWriteToMasterRow<
+                        RxDocument<
+                            UuidModel &
+                            Omit<Prisma.ItemGetPayload<{}>, "deleted" | "serverTimestamp">
+                        >
+                    >[],
                     {
                         async findItem(userId, idField, uuid) {
                             return prisma.item.findUnique({
-                                where: { uuid: uuid, userId }
+                                where: { uuid: uuid, userId },
                             });
                         },
                         async processItems(userId, idField, items) {
-                            const operations = items.map(item => {
+                            const operations = items.map((item) => {
                                 const data = { ...item.data };
 
                                 // Serialize dependson if it exists
-                                if ('dependson' in data && data.dependson !== null &&
-                                    (Array.isArray(data.dependson) || typeof data.dependson === 'object')) {
+                                if (
+                                    "dependson" in data &&
+                                    data.dependson !== null &&
+                                    (Array.isArray(data.dependson) ||
+                                        typeof data.dependson === "object")
+                                ) {
                                     data.dependson = JSON.stringify(data.dependson);
                                 }
 
@@ -461,14 +511,14 @@ const app = new Hono<{ Bindings: Bindings }>()
                                         ...data,
                                         userId,
                                         serverTimestamp: new Date(),
-                                        deleted: item.isDeleted
+                                        deleted: item.isDeleted,
                                     },
                                     create: {
                                         ...data,
                                         userId,
                                         serverTimestamp: new Date(),
-                                        deleted: item.isDeleted
-                                    }
+                                        deleted: item.isDeleted,
+                                    },
                                 });
                             });
 
@@ -479,22 +529,28 @@ const app = new Hono<{ Bindings: Bindings }>()
                             const transformedData = { ...rest };
 
                             // Deserialize dependson for comparison
-                            if ('dependson' in transformedData && typeof transformedData.dependson === 'string') {
-                                transformedData.dependson = transformedData.dependson ?
-                                    JSON.parse(transformedData.dependson) : null;
+                            if (
+                                "dependson" in transformedData &&
+                                typeof transformedData.dependson === "string"
+                            ) {
+                                transformedData.dependson = transformedData.dependson
+                                    ? JSON.parse(transformedData.dependson)
+                                    : null;
                             }
 
                             return { ...transformedData, _deleted: deleted || false };
-                        }
-                    }
+                        },
+                    },
                 );
 
                 return c.json(conflicts);
             } catch (error) {
                 console.error("Error in items/push:", error);
-                throw new HTTPException(400, { message: error instanceof Error ? error.message : 'Unknown error' });
+                throw new HTTPException(400, {
+                    message: error instanceof Error ? error.message : "Unknown error",
+                });
             }
-        }
+        },
     )
     .get(
         "/plannerdata/pull",
@@ -504,7 +560,7 @@ const app = new Hono<{ Bindings: Bindings }>()
                 id: z.string(),
                 serverTimestamp: z.string(),
                 batchSize: z.coerce.number().optional(),
-            })
+            }),
         ),
         async (c) => {
             try {
@@ -512,63 +568,67 @@ const app = new Hono<{ Bindings: Bindings }>()
                 const user = c.get("user");
                 const prisma = await prismaClients.fetch(c.env.DB);
 
-                const result = await handlePullRequest<Prisma.PlannerDataGetPayload<{}>, 'id'>(
-                    user.sub,
-                    'id',
-                    params,
-                    {
-                        async findItems(userId, idField, id, lastPulledTimestamp, batchSize) {
-                            if (lastPulledTimestamp) {
-
-                                return prisma.plannerData.findMany({
-                                    where: {
-                                        userId,
-                                        OR: [
-                                            {
-                                                serverTimestamp: {
-                                                    gt: lastPulledTimestamp
-                                                },
+                const result = await handlePullRequest<
+                    Prisma.PlannerDataGetPayload<{}>,
+                    "id"
+                >(user.sub, "id", params, {
+                    async findItems(userId, idField, id, lastPulledTimestamp, batchSize) {
+                        if (lastPulledTimestamp) {
+                            return prisma.plannerData.findMany({
+                                where: {
+                                    userId,
+                                    OR: [
+                                        {
+                                            serverTimestamp: {
+                                                gt: lastPulledTimestamp,
                                             },
-                                            {
-                                                AND: [
-                                                    { serverTimestamp: lastPulledTimestamp },
-                                                    { id: { gt: id || "" } }
-                                                ]
-                                            }
-                                        ]
-                                    },
-                                    orderBy: [{ serverTimestamp: 'asc' }, { id: 'asc' }],
-                                    take: batchSize
-                                });
-                            } else {
-                                return prisma.plannerData.findMany({
-                                    where: { userId },
-                                    orderBy: [{ serverTimestamp: 'asc' }, { id: 'asc' }],
-                                    take: batchSize
-                                });
-                            }
-                        },
-                        transformItemToDocument(item) {
-                            const { userId, serverTimestamp, deleted, ...rest } = item;
-                            const transformedData = { ...rest };
-
-                            // Deserialize includedSemesters if it exists
-                            if ('includedSemesters' in transformedData && typeof transformedData.includedSemesters === 'string') {
-                                transformedData.includedSemesters = transformedData.includedSemesters ?
-                                    JSON.parse(transformedData.includedSemesters) : [];
-                            }
-
-                            return { ...transformedData, _deleted: deleted || false };
+                                        },
+                                        {
+                                            AND: [
+                                                { serverTimestamp: lastPulledTimestamp },
+                                                { id: { gt: id || "" } },
+                                            ],
+                                        },
+                                    ],
+                                },
+                                orderBy: [{ serverTimestamp: "asc" }, { id: "asc" }],
+                                take: batchSize,
+                            });
+                        } else {
+                            return prisma.plannerData.findMany({
+                                where: { userId },
+                                orderBy: [{ serverTimestamp: "asc" }, { id: "asc" }],
+                                take: batchSize,
+                            });
                         }
-                    }
-                );
+                    },
+                    transformItemToDocument(item) {
+                        const { userId, serverTimestamp, deleted, ...rest } = item;
+                        const transformedData = { ...rest };
+
+                        // Deserialize includedSemesters if it exists
+                        if (
+                            "includedSemesters" in transformedData &&
+                            typeof transformedData.includedSemesters === "string"
+                        ) {
+                            transformedData.includedSemesters =
+                                transformedData.includedSemesters
+                                    ? JSON.parse(transformedData.includedSemesters)
+                                    : [];
+                        }
+
+                        return { ...transformedData, _deleted: deleted || false };
+                    },
+                });
 
                 return c.json(result);
             } catch (error) {
                 console.error("Error in plannerdata/pull:", error);
-                throw new HTTPException(400, { message: error instanceof Error ? error.message : 'Unknown error' });
+                throw new HTTPException(400, {
+                    message: error instanceof Error ? error.message : "Unknown error",
+                });
             }
-        }
+        },
     )
     .post(
         "/plannerdata/push",
@@ -589,8 +649,8 @@ const app = new Hono<{ Bindings: Bindings }>()
                         })
                         .passthrough()
                         .optional(),
-                })
-            )
+                }),
+            ),
         ),
         async (c) => {
             try {
@@ -598,23 +658,38 @@ const app = new Hono<{ Bindings: Bindings }>()
                 const user = c.get("user");
                 const prisma = await prismaClients.fetch(c.env.DB);
 
-                const conflicts = await handlePushRequest<Prisma.PlannerDataGetPayload<{}>>(
+                const conflicts = await handlePushRequest<
+                    Prisma.PlannerDataGetPayload<{}>
+                >(
                     user.sub,
-                    'id',
-                    rows as RxReplicationWriteToMasterRow<RxDocument<IdModel & Omit<Prisma.PlannerDataGetPayload<{}>, 'deleted' | 'serverTimestamp'>>>[],
+                    "id",
+                    rows as RxReplicationWriteToMasterRow<
+                        RxDocument<
+                            IdModel &
+                            Omit<
+                                Prisma.PlannerDataGetPayload<{}>,
+                                "deleted" | "serverTimestamp"
+                            >
+                        >
+                    >[],
                     {
                         async findItem(userId, idField, id) {
                             return prisma.plannerData.findUnique({
-                                where: { userId_id: { userId, id } }
+                                where: { userId_id: { userId, id } },
                             });
                         },
                         async processItems(userId, idField, items) {
-                            const operations = items.map(item => {
+                            const operations = items.map((item) => {
                                 const data = { ...item.data };
 
                                 // Serialize includedSemesters if it exists
-                                if ('includedSemesters' in data && Array.isArray(data.includedSemesters)) {
-                                    data.includedSemesters = JSON.stringify(data.includedSemesters);
+                                if (
+                                    "includedSemesters" in data &&
+                                    Array.isArray(data.includedSemesters)
+                                ) {
+                                    data.includedSemesters = JSON.stringify(
+                                        data.includedSemesters,
+                                    );
                                 } else {
                                     data.includedSemesters = JSON.stringify([]);
                                 }
@@ -625,14 +700,14 @@ const app = new Hono<{ Bindings: Bindings }>()
                                         ...data,
                                         userId,
                                         serverTimestamp: new Date(),
-                                        deleted: item.isDeleted
+                                        deleted: item.isDeleted,
                                     },
                                     create: {
                                         ...data,
                                         userId,
                                         serverTimestamp: new Date(),
-                                        deleted: item.isDeleted
-                                    }
+                                        deleted: item.isDeleted,
+                                    },
                                 });
                             });
 
@@ -643,25 +718,39 @@ const app = new Hono<{ Bindings: Bindings }>()
                             const transformedData = { ...rest };
 
                             // Deserialize includedSemesters for comparison
-                            if ('includedSemesters' in transformedData && typeof transformedData.includedSemesters === 'string') {
-                                transformedData.includedSemesters = transformedData.includedSemesters ?
-                                    JSON.parse(transformedData.includedSemesters) : [];
+                            if (
+                                "includedSemesters" in transformedData &&
+                                typeof transformedData.includedSemesters === "string"
+                            ) {
+                                transformedData.includedSemesters =
+                                    transformedData.includedSemesters
+                                        ? JSON.parse(transformedData.includedSemesters)
+                                        : [];
                             } else {
                                 //@ts-ignore
                                 transformedData.includedSemesters = [];
                             }
 
                             return { ...transformedData, _deleted: deleted || false };
-                        }
-                    }
+                        },
+                    },
                 );
 
-                return c.json(conflicts);
+                return c.json(conflicts as unknown as (Omit<
+                    Prisma.PlannerDataGetPayload<{}>,
+                    "userId" | "deleted" | "serverTimestamp" | "includedSemesters"
+                > & {
+                    _deleted: boolean;
+                    includedSemesters: string[];
+                })[]);
+
             } catch (error) {
                 console.error("Error in plannerdata/push:", error);
-                throw new HTTPException(400, { message: error instanceof Error ? error.message : 'Unknown error' });
+                throw new HTTPException(400, {
+                    message: error instanceof Error ? error.message : "Unknown error",
+                });
             }
-        }
+        },
     )
     .get(
         "/semesters/pull",
@@ -671,7 +760,7 @@ const app = new Hono<{ Bindings: Bindings }>()
                 id: z.string(),
                 serverTimestamp: z.string(),
                 batchSize: z.coerce.number().optional(),
-            })
+            }),
         ),
         async (c) => {
             try {
@@ -679,54 +768,54 @@ const app = new Hono<{ Bindings: Bindings }>()
                 const user = c.get("user");
                 const prisma = await prismaClients.fetch(c.env.DB);
 
-                const result = await handlePullRequest<Prisma.SemesterGetPayload<{}>, 'id'>(
-                    user.sub,
-                    'id',
-                    params,
-                    {
-                        async findItems(userId, idField, id, lastPulledTimestamp, batchSize) {
-                            if (lastPulledTimestamp) {
-                                return prisma.semester.findMany({
-                                    where: {
-                                        userId,
-                                        OR: [
-                                            {
-                                                serverTimestamp: {
-                                                    gt: lastPulledTimestamp
-                                                },
+                const result = await handlePullRequest<
+                    Prisma.SemesterGetPayload<{}>,
+                    "id"
+                >(user.sub, "id", params, {
+                    async findItems(userId, idField, id, lastPulledTimestamp, batchSize) {
+                        if (lastPulledTimestamp) {
+                            return prisma.semester.findMany({
+                                where: {
+                                    userId,
+                                    OR: [
+                                        {
+                                            serverTimestamp: {
+                                                gt: lastPulledTimestamp,
                                             },
-                                            {
-                                                AND: [
-                                                    { serverTimestamp: lastPulledTimestamp },
-                                                    { id: { gt: id || "" } }
-                                                ]
-                                            }
-                                        ]
-                                    },
-                                    orderBy: [{ serverTimestamp: 'asc' }, { id: 'asc' }],
-                                    take: batchSize
-                                });
-                            } else {
-                                return prisma.semester.findMany({
-                                    where: { userId },
-                                    orderBy: [{ serverTimestamp: 'asc' }, { id: 'asc' }],
-                                    take: batchSize
-                                });
-                            }
-                        },
-                        transformItemToDocument(item) {
-                            const { userId, serverTimestamp, deleted, ...rest } = item;
-                            return { ...rest, _deleted: deleted || false };
+                                        },
+                                        {
+                                            AND: [
+                                                { serverTimestamp: lastPulledTimestamp },
+                                                { id: { gt: id || "" } },
+                                            ],
+                                        },
+                                    ],
+                                },
+                                orderBy: [{ serverTimestamp: "asc" }, { id: "asc" }],
+                                take: batchSize,
+                            });
+                        } else {
+                            return prisma.semester.findMany({
+                                where: { userId },
+                                orderBy: [{ serverTimestamp: "asc" }, { id: "asc" }],
+                                take: batchSize,
+                            });
                         }
-                    }
-                );
+                    },
+                    transformItemToDocument(item) {
+                        const { userId, serverTimestamp, deleted, ...rest } = item;
+                        return { ...rest, _deleted: deleted || false };
+                    },
+                });
 
                 return c.json(result);
             } catch (error) {
                 console.error("Error in semesters/pull:", error);
-                throw new HTTPException(400, { message: error instanceof Error ? error.message : 'Unknown error' });
+                throw new HTTPException(400, {
+                    message: error instanceof Error ? error.message : "Unknown error",
+                });
             }
-        }
+        },
     )
     .post(
         "/semesters/push",
@@ -747,8 +836,8 @@ const app = new Hono<{ Bindings: Bindings }>()
                         })
                         .passthrough()
                         .optional(),
-                })
-            )
+                }),
+            ),
         ),
         async (c) => {
             try {
@@ -756,32 +845,42 @@ const app = new Hono<{ Bindings: Bindings }>()
                 const user = c.get("user");
                 const prisma = await prismaClients.fetch(c.env.DB);
 
-                const conflicts = await handlePushRequest<Prisma.SemesterGetPayload<{}>>(
+                const conflicts = await handlePushRequest<
+                    Prisma.SemesterGetPayload<{}>
+                >(
                     user.sub,
-                    'id',
-                    rows as RxReplicationWriteToMasterRow<RxDocument<IdModel & Omit<Prisma.SemesterGetPayload<{}>, 'deleted' | 'serverTimestamp'>>>[],
+                    "id",
+                    rows as RxReplicationWriteToMasterRow<
+                        RxDocument<
+                            IdModel &
+                            Omit<
+                                Prisma.SemesterGetPayload<{}>,
+                                "deleted" | "serverTimestamp"
+                            >
+                        >
+                    >[],
                     {
                         async findItem(userId, idField, id) {
                             return prisma.semester.findUnique({
-                                where: { userId_id: { userId, id } }
+                                where: { userId_id: { userId, id } },
                             });
                         },
                         async processItems(userId, idField, items) {
-                            const operations = items.map(item => {
+                            const operations = items.map((item) => {
                                 return prisma.semester.upsert({
                                     where: { userId_id: { userId, id: item.id } },
                                     update: {
                                         ...item.data,
                                         userId,
                                         serverTimestamp: new Date(),
-                                        deleted: item.isDeleted
+                                        deleted: item.isDeleted,
                                     },
                                     create: {
                                         ...item.data,
                                         userId,
                                         serverTimestamp: new Date(),
-                                        deleted: item.isDeleted
-                                    }
+                                        deleted: item.isDeleted,
+                                    },
                                 });
                             });
 
@@ -790,16 +889,18 @@ const app = new Hono<{ Bindings: Bindings }>()
                         transformItemToDocument(item) {
                             const { userId, serverTimestamp, deleted, ...rest } = item;
                             return { ...rest, _deleted: deleted || false };
-                        }
-                    }
+                        },
+                    },
                 );
 
                 return c.json(conflicts);
             } catch (error) {
                 console.error("Error in semesters/push:", error);
-                throw new HTTPException(400, { message: error instanceof Error ? error.message : 'Unknown error' });
+                throw new HTTPException(400, {
+                    message: error instanceof Error ? error.message : "Unknown error",
+                });
             }
-        }
+        },
     );
 
 export default app;

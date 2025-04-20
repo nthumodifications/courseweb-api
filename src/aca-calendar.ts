@@ -44,7 +44,7 @@ const app = new Hono()
           "Failed to fetch data " + res.status + (await res.text()),
         );
       }
-      const resJson = await res.json() as any;
+      const resJson = (await res.json()) as any;
       if (resJson.success === false) {
         throw new Error("Failed to fetch data " + resJson.result);
       }

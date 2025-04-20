@@ -107,7 +107,7 @@ const getInstallationAccessToken = async (
       },
     },
   );
-  const data = await response.json() as { token: string; expires_at: string };
+  const data = (await response.json()) as { token: string; expires_at: string };
 
   return data.token;
 };
@@ -151,7 +151,7 @@ const app = new Hono()
           body: JSON.stringify({ title, body, labels }),
         },
       );
-      const data = await response.json() as GithubIssue;
+      const data = (await response.json()) as GithubIssue;
       return c.json(data);
     },
   )

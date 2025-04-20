@@ -13,8 +13,8 @@ import planner from "./planner-replication";
 import type { D1Database } from "@cloudflare/workers-types";
 
 export type Bindings = {
-  DB: D1Database
-}
+  DB: D1Database;
+};
 
 export const app = new Hono<{ Bindings: Bindings }>()
   .use(

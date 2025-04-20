@@ -99,7 +99,7 @@ const app = new Hono()
         }),
         keepalive: true,
       });
-      const json = await response.json() as any;
+      const json = (await response.json()) as any;
       const myHeaders = new Headers();
       myHeaders.append("Authorization", `Bearer ${json.Data.AccessToken}`);
       myHeaders.append("DeviceID", uuid);
