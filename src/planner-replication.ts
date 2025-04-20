@@ -519,6 +519,7 @@ const app = new Hono<{ Bindings: Bindings }>()
                     {
                         async findItems(userId, idField, id, lastPulledTimestamp, batchSize) {
                             if (lastPulledTimestamp) {
+
                                 return prisma.plannerData.findMany({
                                     where: {
                                         userId,

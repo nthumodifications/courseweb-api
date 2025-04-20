@@ -65,8 +65,6 @@ model PlannerData {
   graduationYear   String
   includedSemesters String    // Store as JSON string
   description      String?
-  createdAt        DateTime?
-  updatedAt        DateTime?
   serverTimestamp  DateTime  @updatedAt
   userId           String
   deleted          Boolean   @default(false)
@@ -81,8 +79,8 @@ model Semester {
   status        String
   year          String
   term          String
-  startDate     DateTime?
-  endDate       DateTime?
+  startDate     String?
+  endDate       String?
   isActive      Boolean
   order         Int?
   serverTimestamp DateTime @updatedAt
