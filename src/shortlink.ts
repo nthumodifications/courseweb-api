@@ -55,7 +55,7 @@ const app = new Hono()
           },
           body: url,
         },
-      ).then((response) => response.json());
+      ).then((response) => response.json() as any);
 
       if (!res.success) {
         throw new Error("Failed to create short link");
