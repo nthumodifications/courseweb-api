@@ -48,3 +48,25 @@ export function deepCompare(
       deepCompare(a[key], b[key], maxDepth, currentDepth + 1),
   );
 }
+
+/**
+ * Recursively removes null values from an object
+ * Treats { prop: null } and {} as equivalent
+ */
+export function stripNullValues<T extends object>(obj: T): Partial<T> {
+  if (!obj) return obj;
+
+  const result: Partial<T> = {};
+
+  for (const key in obj) {
+    if (obj[key] !== null) {
+      if (typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
+        result[key] = stripNullValues(obj[key] as any) as T[Extract<keyof T, string>];
+      } else {
+        result[key] = obj[key];
+      }
+    }
+  }
+
+  return result;
+}

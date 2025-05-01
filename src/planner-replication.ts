@@ -8,7 +8,7 @@ import {
     type RxReplicationWriteToMasterRow,
 } from "rxdb/plugins/core";
 import { PrismaClient, Prisma } from "./generated/client";
-import { deepCompare } from "./utils/deepCompare";
+import { deepCompare, stripNullValues } from "./utils/deepCompare";
 import { HTTPException } from "hono/http-exception";
 import type { Bindings } from "./index";
 import prismaClients from "./prisma/client";
@@ -191,8 +191,12 @@ async function handlePushRequest<M extends Model>(
         if (itemInDb && assumedMasterState) {
             const itemAsDocument = handlers.transformItemToDocument(itemInDb);
 
+            // Strip null values from both objects before comparison
+            const strippedItemAsDocument = stripNullValues(itemAsDocument);
+            const strippedAssumedState = stripNullValues(assumedMasterState);
+
             // If we have an assumed state but it doesn't match what's in the DB, it's a conflict
-            if (!deepCompare(itemAsDocument, assumedMasterState)) {
+            if (!deepCompare(strippedItemAsDocument, strippedAssumedState)) {
                 conflicts.push(itemAsDocument);
                 continue;
             }
