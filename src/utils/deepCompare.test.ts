@@ -133,13 +133,13 @@ describe("deepCompare", () => {
 
 describe("stripNullValues", () => {
   it("should return the same object if no null values exist", () => {
-    const obj = { a: 1, b: 'test', c: true };
+    const obj = { a: 1, b: "test", c: true };
     expect(stripNullValues(obj)).toEqual(obj);
   });
 
   it("should remove null values from an object", () => {
-    const obj = { a: 1, b: null, c: 'test' };
-    expect(stripNullValues(obj)).toEqual({ a: 1, c: 'test' });
+    const obj = { a: 1, b: null, c: "test" };
+    expect(stripNullValues(obj)).toEqual({ a: 1, c: "test" });
   });
 
   it("should handle nested objects", () => {
@@ -147,23 +147,23 @@ describe("stripNullValues", () => {
       a: 1,
       b: {
         c: null,
-        d: 'test',
+        d: "test",
         e: {
           f: null,
-          g: 42
-        }
-      }
+          g: 42,
+        },
+      },
     };
 
     // Type assertion is needed to avoid TypeScript errors about missing properties
     const expected = {
       a: 1,
       b: {
-        d: 'test',
+        d: "test",
         e: {
-          g: 42
-        }
-      }
+          g: 42,
+        },
+      },
     };
 
     expect(stripNullValues(obj)).toEqual(expected as any);
@@ -196,6 +196,8 @@ describe("stripNullValues", () => {
     const obj2 = { a: 1 };
 
     // Using stripNullValues should make these objects equal for comparison
-    expect(deepCompare(stripNullValues(obj1), stripNullValues(obj2))).toBe(true);
+    expect(deepCompare(stripNullValues(obj1), stripNullValues(obj2))).toBe(
+      true,
+    );
   });
 });

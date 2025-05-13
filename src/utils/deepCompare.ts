@@ -60,8 +60,11 @@ export function stripNullValues<T extends object>(obj: T): Partial<T> {
 
   for (const key in obj) {
     if (obj[key] !== null) {
-      if (typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
-        result[key] = stripNullValues(obj[key] as any) as T[Extract<keyof T, string>];
+      if (typeof obj[key] === "object" && !Array.isArray(obj[key])) {
+        result[key] = stripNullValues(obj[key] as any) as T[Extract<
+          keyof T,
+          string
+        >];
       } else {
         result[key] = obj[key];
       }
