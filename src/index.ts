@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 
 import acaCalendar from "./aca-calendar";
+import calendarProxy from "./calendar-proxy";
 import weather from "./weather";
 import course from "./course";
 import venue from "./venue";
@@ -27,8 +28,8 @@ export const app = new Hono<{ Bindings: Bindings }>()
   .use(logger())
   .get("/", (c) => {
     return c.text("I AM NTHUMODS UWU");
-  })
-  .route("/acacalendar", acaCalendar)
+  }).route("/acacalendar", acaCalendar)
+  .route("/calendar", calendarProxy)
   .route("/weather", weather)
   .route("/course", course)
   .route("/venue", venue)
