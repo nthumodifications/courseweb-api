@@ -11,7 +11,8 @@ import shortlink from "./shortlink";
 import issue from "./issue";
 import headlessAis from "./headless-ais";
 import planner from "./planner-replication";
-import type { D1Database } from "@cloudflare/workers-types";
+import { D1Database } from '@cloudflare/workers-types';
+import { scrapeArchivedCourses, scrapeSyllabus, syncCoursesToAlgolia } from './scheduled/syllabus';
 
 export type Bindings = {
   DB: D1Database;
@@ -38,4 +39,28 @@ export const app = new Hono<{ Bindings: Bindings }>()
   .route("/issue", issue)
   .route("/planner", planner);
 
-export default app;
+
+const APIHandler = {
+  ...app,
+  async scheduled(
+    controller: ScheduledController,
+    env: Env,
+    ctx: ExecutionContext,
+  ) {
+    console.log("cron processed");
+    ctx.waitUntil(new Promise(async (resolve) => {
+      const semester = '11320';
+      // Scrape archived courses and syllabus
+      try {
+        const cache = await scrapeArchivedCourses(env, semester);
+        await scrapeSyllabus(env, semester, cache);
+        resolve(void 0);
+      } catch (error) {
+        console.error("Error during scheduled task:", error);
+      }
+    }))
+  },
+
+};
+
+export default APIHandler;
