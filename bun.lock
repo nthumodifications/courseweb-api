@@ -4,6 +4,7 @@
     "": {
       "name": "api",
       "dependencies": {
+        "@algolia/requester-fetch": "^5.25.0",
         "@cloudflare/workers-types": "^4.20250414.0",
         "@hono/zod-validator": "^0.4.3",
         "@prisma/adapter-d1": "^6.6.0",
@@ -33,6 +34,10 @@
     },
   },
   "packages": {
+    "@algolia/client-common": ["@algolia/client-common@5.25.0", "", {}, "sha512-il1zS/+Rc6la6RaCdSZ2YbJnkQC6W1wiBO8+SH+DE6CPMWBU6iDVzH0sCKSAtMWl9WBxoN6MhNjGBnCv9Yy2bA=="],
+
+    "@algolia/requester-fetch": ["@algolia/requester-fetch@5.25.0", "", { "dependencies": { "@algolia/client-common": "5.25.0" } }, "sha512-rtzXwqzFi1edkOF6sXxq+HhmRKDy7tz84u0o5t1fXwz0cwx+cjpmxu/6OQKTdOJFS92JUYHsG51Iunie7xbqfQ=="],
+
     "@babel/runtime": ["@babel/runtime@7.27.0", "", { "dependencies": { "regenerator-runtime": "^0.14.0" } }, "sha512-VtPOkrdPHZsKc/clNqyi9WUA8TINkZ4cGk63UUE3u4pmB2k+ZMQRDuIOagv8UVd6j7k0T3+RRIb7beKTebNbcw=="],
 
     "@cloudflare/kv-asset-handler": ["@cloudflare/kv-asset-handler@0.4.0", "", { "dependencies": { "mime": "^3.0.0" } }, "sha512-+tv3z+SPp+gqTIcImN9o0hqE9xyfQjI1XD9pL6NuKjua9B1y7mNYv0S9cP+QEbA4ppVgGZEmKOvHX5G5Ei1CVA=="],
