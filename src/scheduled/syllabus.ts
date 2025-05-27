@@ -465,7 +465,6 @@ export const scrapeSyllabus = async (
     if (error) throw error;
     return data;
   };
-
   const ACIXSTORE = await getAnonACIX();
 
   if (ACIXSTORE === null)

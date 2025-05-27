@@ -8,7 +8,7 @@ export const supabaseWithEnv = (url: string, key: string) => {
     throw new Error("Supabase credentials not found");
   }
   return createClient<Database>(url, key);
-}
+};
 
 const supabase_server = (c: Context) => {
   const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = env<{
@@ -17,6 +17,5 @@ const supabase_server = (c: Context) => {
   }>(c);
   return supabaseWithEnv(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 };
-
 
 export default supabase_server;
