@@ -11,8 +11,12 @@ import shortlink from "./shortlink";
 import issue from "./issue";
 import headlessAis from "./headless-ais";
 import planner from "./planner-replication";
-import { D1Database } from '@cloudflare/workers-types';
-import { scrapeArchivedCourses, scrapeSyllabus, syncCoursesToAlgolia } from './scheduled/syllabus';
+import { D1Database } from "@cloudflare/workers-types";
+import {
+  scrapeArchivedCourses,
+  scrapeSyllabus,
+  syncCoursesToAlgolia,
+} from "./scheduled/syllabus";
 
 export type Bindings = {
   DB: D1Database;
@@ -29,7 +33,8 @@ export const app = new Hono<{ Bindings: Bindings }>()
   .use(logger())
   .get("/", (c) => {
     return c.text("I AM NTHUMODS UWU");
-  }).route("/acacalendar", acaCalendar)
+  })
+  .route("/acacalendar", acaCalendar)
   .route("/calendar", calendarProxy)
   .route("/weather", weather)
   .route("/course", course)
@@ -39,7 +44,6 @@ export const app = new Hono<{ Bindings: Bindings }>()
   .route("/issue", issue)
   .route("/planner", planner);
 
-
 const APIHandler = {
   ...app,
   async scheduled(
@@ -48,19 +52,20 @@ const APIHandler = {
     ctx: ExecutionContext,
   ) {
     console.log("cron processed");
-    ctx.waitUntil(new Promise(async (resolve) => {
-      const semester = '11410';
-      // Scrape archived courses and syllabus
-      try {
-        const cache = await scrapeArchivedCourses(env, semester);
-        await scrapeSyllabus(env, semester, cache);
-        resolve(void 0);
-      } catch (error) {
-        console.error("Error during scheduled task:", error);
-      }
-    }))
+    ctx.waitUntil(
+      new Promise(async (resolve) => {
+        const semester = "11410";
+        // Scrape archived courses and syllabus
+        try {
+          const cache = await scrapeArchivedCourses(env, semester);
+          await scrapeSyllabus(env, semester, cache);
+          resolve(void 0);
+        } catch (error) {
+          console.error("Error during scheduled task:", error);
+        }
+      }),
+    );
   },
-
 };
 
 export default APIHandler;
