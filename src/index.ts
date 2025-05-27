@@ -49,7 +49,7 @@ const APIHandler = {
   ) {
     console.log("cron processed");
     ctx.waitUntil(new Promise(async (resolve) => {
-      const semester = '11320';
+      const semester = '11410';
       // Scrape archived courses and syllabus
       try {
         const cache = await scrapeArchivedCourses(env, semester);

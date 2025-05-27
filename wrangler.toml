@@ -21,4 +21,4 @@ database_name = "data-d1"
 database_id = "c6b4c91d-35a1-4218-9226-a8ab217150fb"
 
 [triggers]
-crons = ["0 4 * * *"]
+crons = ["30 4 * * *"]
