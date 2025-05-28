@@ -51,7 +51,11 @@ export const scrapeArchivedCourses = async (env: Env, semester: string) => {
     .then((res) => res.arrayBuffer())
     .then((arrayBuffer) =>
       new TextDecoder("big5").decode(new Uint8Array(arrayBuffer)),
-    );
+    )
+    .catch((error) => {
+      console.error("Failed to fetch landing page:", error);
+      throw new Error("Failed to fetch landing page, please try again later");
+    });
 
 
   // search for the text https://www.ccxp.nthu.edu.tw/ccxp/INQUIRE/JH/mod/auth_img/auth_img.php?ACIXSTORE=643u4hfveif4and3kbudjqusu7
@@ -62,7 +66,11 @@ export const scrapeArchivedCourses = async (env: Env, semester: string) => {
   const acixStore = acixStoreMatch[1];
 
   const ocrResults = await fetch(`https://ocr.nthumods.com/?url=https://www.ccxp.nthu.edu.tw/ccxp/INQUIRE/JH/mod/auth_img/auth_img.php?ACIXSTORE=${acixStore}&d=3`)
-    .then((res) => res.text());
+    .then((res) => res.text())
+    .catch((error) => {
+      console.error("Failed to fetch OCR results:", error);
+      throw new Error("Failed to fetch OCR results, please try again later");
+    })
   if (ocrResults.length != 3) {
     throw new Error("OCR results are not valid, please try again later");
   }
@@ -154,7 +162,11 @@ export const scrapeArchivedCourses = async (env: Env, semester: string) => {
       }),
       method: "POST",
       cf: { cacheTtl: 0 }
-    });
+    })
+      .catch((error) => {
+        console.error(`Failed to fetch courses for ${department.code} ${yearSemester}:`, error);
+        throw new Error(`Failed to fetch courses for ${department.code} ${yearSemester}, please try again later`);
+      });
     return response;
   };
 
@@ -168,7 +180,10 @@ export const scrapeArchivedCourses = async (env: Env, semester: string) => {
         .then((res) => res.arrayBuffer())
         .then((arrayBuffer) =>
           new TextDecoder("big5").decode(new Uint8Array(arrayBuffer)),
-        );
+        )
+        .catch((error) => {
+          console.error(`Failed to fetch courses for ${department.code} ${semester}:`, error);
+        });
       const doc = parseHTML(text).document;
 
 
@@ -393,7 +408,14 @@ const downloadPDF = async (env: Env, url: string, c_key: string) => {
   //get url+c_key file as a arrayBuffer
   const file = await fetch(url, { cf: { cacheTtl: 0 } })
     .then((res) => res.arrayBuffer())
-    .then((arrayBuffer) => Buffer.from(arrayBuffer));
+    .then((arrayBuffer) => Buffer.from(arrayBuffer))
+    .catch((error) => {
+      console.error(`Failed to download PDF for ${c_key}:`, error);
+    });
+  if (!file) {
+    console.error(`No file found for ${c_key}, skipping...`);
+    return;
+  }
   //save file to local fs
   // await fs.writeFileSync(c_key + '.pdf', file)
   await supabaseWithEnv(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY).storage
@@ -477,7 +499,11 @@ export const scrapeSyllabus = async (
       .then((res) => res.arrayBuffer())
       .then((arrayBuffer) =>
         new TextDecoder("big5").decode(new Uint8Array(arrayBuffer)),
-      );
+      )
+      .catch((error) => {
+        console.error(`Failed to fetch syllabus for ${c_key}:`, error);
+        return "";
+      });
     return text;
   }; const courses = cachedCourses ?? await fetchCourses();
 
@@ -521,7 +547,7 @@ export const scrapeSyllabus = async (
   };
 
   // Process courses with concurrency limit of 50
-  const concurrencyLimit = 20;
+  const concurrencyLimit = 50;
   for (let i = 0; i < courses.length; i += concurrencyLimit) {
     const batch = courses.slice(i, i + concurrencyLimit);
     await Promise.all(batch.map(processCourse));
@@ -567,7 +593,7 @@ export const syncCoursesToAlgolia = async (env: Env, semester: string) => {
       console.log(`Saved ${algoliaChunk.length} courses to Algolia, taskID: ${taskIDs}`);
     })
       .catch((error) => {
-        console.error("Error saving courses to Algolia:");
+        console.error("Error saving courses to Algolia:", error);
       });
   }
 

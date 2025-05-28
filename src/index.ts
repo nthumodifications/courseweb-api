@@ -59,6 +59,8 @@ const APIHandler = {
         try {
           const cache = await scrapeArchivedCourses(env, semester);
           await scrapeSyllabus(env, semester, cache);
+          // await syncCoursesToAlgolia(env, semester);
+          console.log("Scheduled tasks completed successfully.");
           resolve(void 0);
         } catch (error) {
           console.error("Error during scheduled task:", error);
