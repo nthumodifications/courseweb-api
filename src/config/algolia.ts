@@ -10,10 +10,12 @@ const algolia = (c: Context) => {
   }>(c);
 
   return algoliaWithEnv(ALGOLIA_APP_ID, ALGOLIA_API_KEY);
-}
+};
 
 export const algoliaWithEnv = (appId: string, apiKey: string) => {
-  const client = algoliasearch(appId, apiKey, { requester: createFetchRequester() });
+  const client = algoliasearch(appId, apiKey, {
+    requester: createFetchRequester(),
+  });
   const index = client.initIndex("nthu_courses");
   return index;
 };

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { env } from "hono/adapter";
 
 type GithubEnv = {
-  CLIENT_ID: string;
+  GITHUB_CLIENT_ID: string;
   GITHUB_APP_PRIVATE_KEY: string;
   GITHUB_INSTALLATION_ID: string;
 };
@@ -126,14 +126,17 @@ const app = new Hono()
     async (c) => {
       const { title, body, labels } = c.req.valid("form");
 
-      const { CLIENT_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_INSTALLATION_ID } =
-        env<GithubEnv>(c);
+      const {
+        GITHUB_CLIENT_ID,
+        GITHUB_APP_PRIVATE_KEY,
+        GITHUB_INSTALLATION_ID,
+      } = env<GithubEnv>(c);
 
       // base64 encoded private key to utf8, not using buffer
       const privateKey = atob(GITHUB_APP_PRIVATE_KEY);
 
       const accessToken = await getInstallationAccessToken(
-        CLIENT_ID,
+        GITHUB_CLIENT_ID,
         privateKey,
         GITHUB_INSTALLATION_ID,
       );
@@ -165,12 +168,15 @@ const app = new Hono()
     ),
     async (c) => {
       const { tag } = c.req.valid("query");
-      const { CLIENT_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_INSTALLATION_ID } =
-        env<GithubEnv>(c);
+      const {
+        GITHUB_CLIENT_ID,
+        GITHUB_APP_PRIVATE_KEY,
+        GITHUB_INSTALLATION_ID,
+      } = env<GithubEnv>(c);
       const privateKey = atob(GITHUB_APP_PRIVATE_KEY);
 
       const accessToken = await getInstallationAccessToken(
-        CLIENT_ID,
+        GITHUB_CLIENT_ID,
         privateKey,
         GITHUB_INSTALLATION_ID,
       );

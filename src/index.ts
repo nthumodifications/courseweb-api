@@ -16,6 +16,7 @@ import {
   scrapeArchivedCourses,
   scrapeSyllabus,
   syncCoursesToAlgolia,
+  exportCoursesToAlgoliaFile,
 } from "./scheduled/syllabus";
 
 export type Bindings = {
@@ -59,7 +60,9 @@ const APIHandler = {
         try {
           const cache = await scrapeArchivedCourses(env, semester);
           await scrapeSyllabus(env, semester, cache);
+          // await scrapeSyllabus(env, semester);
           // await syncCoursesToAlgolia(env, semester);
+          // await exportCoursesToAlgoliaFile(env, semester);
           console.log("Scheduled tasks completed successfully.");
           resolve(void 0);
         } catch (error) {
