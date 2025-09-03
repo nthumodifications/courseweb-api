@@ -8,6 +8,7 @@ type GithubEnv = {
   GITHUB_CLIENT_ID: string;
   GITHUB_APP_PRIVATE_KEY: string;
   GITHUB_INSTALLATION_ID: string;
+  TURNSTILE_SECRET_KEY: string;
 };
 
 type GithubIssue = {
@@ -121,25 +122,56 @@ const getInstallationAccessToken = async (
   return data.token;
 };
 
+const verifyTurnstile = async (token: string, secretKey: string) => {
+  const url = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+  const formData = new FormData();
+  formData.append("secret", secretKey);
+  formData.append("response", token);
+
+  try {
+    const result = await fetch(url, {
+      body: formData,
+      method: "POST",
+    });
+    const outcome = (await result.json()) as { success: boolean };
+    return outcome.success;
+  } catch (err) {
+    return false;
+  }
+};
+
 const app = new Hono()
   .post(
     "/",
     zValidator(
-      "form",
+      "json",
       z.object({
         title: z.string(),
         body: z.string(),
         labels: z.array(z.string()),
+        turnstileToken: z.string().optional(),
       }),
     ),
     async (c) => {
-      const { title, body, labels } = c.req.valid("form");
+      const { title, body, labels, turnstileToken } = c.req.valid("json");
 
       const {
         GITHUB_CLIENT_ID,
         GITHUB_APP_PRIVATE_KEY,
         GITHUB_INSTALLATION_ID,
+        TURNSTILE_SECRET_KEY,
       } = env<GithubEnv>(c);
+
+      // Verify Turnstile token if provided
+      if (turnstileToken) {
+        const isValid = await verifyTurnstile(
+          turnstileToken,
+          TURNSTILE_SECRET_KEY,
+        );
+        if (!isValid) {
+          return c.json({ error: "Invalid Turnstile verification" }, 400);
+        }
+      }
 
       // base64 encoded private key to utf8, not using buffer
       const privateKey = atob(GITHUB_APP_PRIVATE_KEY);
