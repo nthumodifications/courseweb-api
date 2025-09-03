@@ -95,19 +95,28 @@ const getInstallationAccessToken = async (
   privateKey: string,
   installation_id: string,
 ) => {
-  const jwtToken = getJwt(client_id, privateKey);
+  const jwtToken = await getJwt(client_id, privateKey);
 
   const response = await fetch(
     `https://api.github.com/app/installations/${installation_id}/access_tokens`,
     {
       method: "POST",
       headers: {
+        "User-Agent": "nthumods-app",
         Authorization: `Bearer ${jwtToken}`,
         Accept: "application/vnd.github.v3+json",
       },
     },
   );
-  const data = (await response.json()) as { token: string; expires_at: string };
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to get installation access token: ${response.status} ${response.statusText}`,
+    );
+  }
+  const text = await response.text();
+
+  const data = JSON.parse(text) as { token: string; expires_at: string };
 
   return data.token;
 };
@@ -148,6 +157,7 @@ const app = new Hono()
         {
           method: "POST",
           headers: {
+            "User-Agent": "nthumods-app",
             Authorization: `token ${accessToken}`,
             Accept: "application/vnd.github.v3+json",
           },
@@ -188,6 +198,7 @@ const app = new Hono()
         {
           method: "GET",
           headers: {
+            "User-Agent": "nthumods-app",
             Authorization: `token ${accessToken}`,
             Accept: "application/vnd.github.v3+json",
           },
