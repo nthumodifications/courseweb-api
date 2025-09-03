@@ -9,7 +9,7 @@ const retryWithBackoff = async <T>(
   fn: () => Promise<T>,
   maxRetries: number = 6,
   baseDelay: number = 1000,
-  identifier?: string
+  identifier?: string,
 ): Promise<T> => {
   let lastError: Error = new Error("Unknown error occurred");
 
@@ -32,7 +32,7 @@ const retryWithBackoff = async <T>(
         ? `Attempt ${attempt + 1} failed for ${identifier}, retrying in ${Math.round(delay)}ms: ${lastError.message}`
         : `Attempt ${attempt + 1} failed, retrying in ${Math.round(delay)}ms: ${lastError.message}`;
       console.warn(retryMsg);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 
@@ -91,14 +91,15 @@ export const scrapeArchivedCourses = async (env: Env, semester: string) => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      return response.arrayBuffer()
+      return response
+        .arrayBuffer()
         .then((arrayBuffer) =>
           new TextDecoder("big5").decode(new Uint8Array(arrayBuffer)),
         );
     },
     3,
     1000,
-    "landing page"
+    "landing page",
   );
 
   // search for the ACIXSTORE
@@ -126,7 +127,7 @@ export const scrapeArchivedCourses = async (env: Env, semester: string) => {
     },
     3,
     2000,
-    "OCR results"
+    "OCR results",
   );
   const webLanding = parseHTML(landingPageRes).document;
 
@@ -232,7 +233,7 @@ export const scrapeArchivedCourses = async (env: Env, semester: string) => {
       },
       3,
       1500,
-      `${department.code} courses`
+      `${department.code} courses`,
     );
   };
 
@@ -249,7 +250,8 @@ export const scrapeArchivedCourses = async (env: Env, semester: string) => {
         console.log(`Scraping ${department.code} ${semester}...`);
 
         const response = await fetchCourses(department, semester);
-        const text = await response.arrayBuffer()
+        const text = await response
+          .arrayBuffer()
           .then((arrayBuffer) =>
             new TextDecoder("big5").decode(new Uint8Array(arrayBuffer)),
           );
@@ -272,7 +274,9 @@ export const scrapeArchivedCourses = async (env: Env, semester: string) => {
           }
 
           // Check if the course is already added
-          if (normalizedCourses.find((course: any) => course.raw_id === course_id)) {
+          if (
+            normalizedCourses.find((course: any) => course.raw_id === course_id)
+          ) {
             continue;
           }
 
@@ -315,7 +319,9 @@ export const scrapeArchivedCourses = async (env: Env, semester: string) => {
           let reserve = 0;
           const size_limit = cells[6].textContent?.trim() ?? "";
           if (size_limit.includes("新生保留")) {
-            reserve = parseInt(size_limit.split("新生保留")[1].replace("人", ""));
+            reserve = parseInt(
+              size_limit.split("新生保留")[1].replace("人", ""),
+            );
           }
 
           const note = cells[7].textContent?.trim() ?? "";
@@ -457,7 +463,9 @@ export const scrapeArchivedCourses = async (env: Env, semester: string) => {
         // Add successful department courses to the main array
         normalizedCourses.push(...departmentCourses);
         successfulDepartments++;
-        console.log(`Successfully scraped ${departmentCourses.length} courses from ${department.code}`);
+        console.log(
+          `Successfully scraped ${departmentCourses.length} courses from ${department.code}`,
+        );
       } catch (error) {
         console.error(`Failed to scrape department ${department.code}:`, error);
         failedDepartments.push(department.code);
@@ -466,12 +474,16 @@ export const scrapeArchivedCourses = async (env: Env, semester: string) => {
     });
 
     await Promise.allSettled(batchPromises);
-    console.log(`Completed batch ${Math.floor(i / concurrentBatches) + 1}/${Math.ceil(departments.length / concurrentBatches)}`);
+    console.log(
+      `Completed batch ${Math.floor(i / concurrentBatches) + 1}/${Math.ceil(departments.length / concurrentBatches)}`,
+    );
   }
 
-  console.log(`Successfully scraped ${successfulDepartments}/${departments.length} departments`);
+  console.log(
+    `Successfully scraped ${successfulDepartments}/${departments.length} departments`,
+  );
   if (failedDepartments.length > 0) {
-    console.warn(`Failed departments: ${failedDepartments.join(', ')}`);
+    console.warn(`Failed departments: ${failedDepartments.join(", ")}`);
   }
   console.log(`Found ${normalizedCourses.length} courses in ${semester}`);
 
@@ -498,16 +510,21 @@ export const scrapeArchivedCourses = async (env: Env, semester: string) => {
         },
         3,
         2000,
-        `database chunk ${successfulChunks + 1}/${chunked.length}`
+        `database chunk ${successfulChunks + 1}/${chunked.length}`,
       );
       successfulChunks++;
     } catch (error) {
-      console.error(`Failed to upsert chunk ${successfulChunks + 1}/${chunked.length}:`, error);
+      console.error(
+        `Failed to upsert chunk ${successfulChunks + 1}/${chunked.length}:`,
+        error,
+      );
       // Continue with other chunks instead of failing completely
     }
   }
 
-  console.log(`Successfully saved ${successfulChunks}/${chunked.length} chunks to database`);
+  console.log(
+    `Successfully saved ${successfulChunks}/${chunked.length} chunks to database`,
+  );
 
   return normalizedCourses;
 };
@@ -525,12 +542,15 @@ const downloadPDF = async (env: Env, url: string, c_key: string) => {
       },
       3,
       2000,
-      `PDF download ${c_key}`
+      `PDF download ${c_key}`,
     );
 
     await retryWithBackoff(
       async () => {
-        const { error } = await supabaseWithEnv(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+        const { error } = await supabaseWithEnv(
+          env.SUPABASE_URL,
+          env.SUPABASE_SERVICE_ROLE_KEY,
+        )
           .storage.from("syllabus")
           .upload(c_key + ".pdf", file, {
             cacheControl: (60 * 60 * 24 * 30).toString(), // cache the file for 30days
@@ -541,7 +561,7 @@ const downloadPDF = async (env: Env, url: string, c_key: string) => {
       },
       3,
       1500,
-      `PDF upload ${c_key}`
+      `PDF upload ${c_key}`,
     );
 
     console.log(`Successfully uploaded PDF for ${c_key}`);
@@ -583,7 +603,8 @@ const parseContent = async (env: Env, html: string, c_key: string) => {
 const getAnonACIX = async () => {
   return await retryWithBackoff(
     async () => {
-      const url = "https://www.ccxp.nthu.edu.tw/ccxp/INQUIRE/JH/6/6.2/6.2.6/JH626001.php";
+      const url =
+        "https://www.ccxp.nthu.edu.tw/ccxp/INQUIRE/JH/6/6.2/6.2.6/JH626001.php";
       const response = await fetch(url, { redirect: "manual" });
       const location = response.headers.get("location");
       const ACIXSTORE = location?.split("=")[1];
@@ -596,7 +617,7 @@ const getAnonACIX = async () => {
     },
     3,
     1000,
-    "anonymous ACIX"
+    "anonymous ACIX",
   );
 };
 
@@ -621,7 +642,7 @@ export const scrapeSyllabus = async (
       },
       3,
       2000,
-      "course fetch"
+      "course fetch",
     );
   };
 
@@ -641,9 +662,12 @@ export const scrapeSyllabus = async (
       },
       3,
       1500,
-      `syllabus HTML ${c_key}`
+      `syllabus HTML ${c_key}`,
     ).catch((error) => {
-      console.error(`Failed to fetch syllabus for ${c_key} after retries:`, error);
+      console.error(
+        `Failed to fetch syllabus for ${c_key} after retries:`,
+        error,
+      );
       return ""; // Return empty string to continue processing other courses
     });
   };
@@ -694,7 +718,7 @@ export const scrapeSyllabus = async (
         },
         3,
         1000,
-        `syllabus upsert ${raw_id}`
+        `syllabus upsert ${raw_id}`,
       );
 
       if (cachedCourses) {
@@ -709,17 +733,22 @@ export const scrapeSyllabus = async (
             ...(course.elective_for || []),
             ...(course.compulsory_for || []),
           ],
-          separate_times: course.times.flatMap((s: string) => s.match(/.{1,2}/g)),
+          separate_times: course.times.flatMap((s: string) =>
+            s.match(/.{1,2}/g),
+          ),
           courseLevel: course.course[0] + "000",
         };
 
         await retryWithBackoff(
           async () => {
-            await algoliaWithEnv(env.ALGOLIA_APP_ID, env.ALGOLIA_API_KEY).saveObject(algoliaCourse);
+            await algoliaWithEnv(
+              env.ALGOLIA_APP_ID,
+              env.ALGOLIA_API_KEY,
+            ).saveObject(algoliaCourse);
           },
           2,
           1000,
-          `algolia sync ${raw_id}`
+          `algolia sync ${raw_id}`,
         ).catch((error) => {
           console.error(`Failed to sync ${raw_id} to Algolia:`, error);
           // Don't fail the entire process for Algolia sync failures
@@ -738,18 +767,22 @@ export const scrapeSyllabus = async (
   const concurrencyLimit = 30; // Reduced from 50 to be more conservative
   for (let i = 0; i < courses.length; i += concurrencyLimit) {
     const batch = courses.slice(i, i + concurrencyLimit);
-    const batchPromises = batch.map(course => processCourse(course));
+    const batchPromises = batch.map((course) => processCourse(course));
     await Promise.allSettled(batchPromises);
 
-    console.log(`Completed batch ${Math.floor(i / concurrencyLimit) + 1}/${Math.ceil(courses.length / concurrencyLimit)}`);
+    console.log(
+      `Completed batch ${Math.floor(i / concurrencyLimit) + 1}/${Math.ceil(courses.length / concurrencyLimit)}`,
+    );
 
     // Add a small delay between batches to avoid overwhelming the server
     if (i + concurrencyLimit < courses.length) {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
   }
 
-  console.log(`Scraped syllabus for ${processedCount}/${courses.length} courses in semester ${semester}`);
+  console.log(
+    `Scraped syllabus for ${processedCount}/${courses.length} courses in semester ${semester}`,
+  );
   if (failedCount > 0) {
     console.warn(`Failed to process ${failedCount} courses`);
   }
@@ -772,7 +805,7 @@ export const syncCoursesToAlgolia = async (env: Env, semester: string) => {
     },
     3,
     2000,
-    "course data fetch for Algolia sync"
+    "course data fetch for Algolia sync",
   );
 
   const chunked = query
@@ -799,26 +832,38 @@ export const syncCoursesToAlgolia = async (env: Env, semester: string) => {
 
       await retryWithBackoff(
         async () => {
-          const { taskIDs } = await algoliaWithEnv(env.ALGOLIA_APP_ID, env.ALGOLIA_API_KEY)
-            .saveObjects(algoliaChunk);
-          console.log(`Saved ${algoliaChunk.length} courses to Algolia, taskID: ${taskIDs}`);
+          const { taskIDs } = await algoliaWithEnv(
+            env.ALGOLIA_APP_ID,
+            env.ALGOLIA_API_KEY,
+          ).saveObjects(algoliaChunk);
+          console.log(
+            `Saved ${algoliaChunk.length} courses to Algolia, taskID: ${taskIDs}`,
+          );
         },
         3,
         2000,
-        `Algolia chunk ${successfulChunks + 1}/${chunked.length}`
+        `Algolia chunk ${successfulChunks + 1}/${chunked.length}`,
       );
 
       successfulChunks++;
     } catch (error) {
-      console.error(`Error saving chunk ${successfulChunks + 1}/${chunked.length} to Algolia:`, error);
+      console.error(
+        `Error saving chunk ${successfulChunks + 1}/${chunked.length} to Algolia:`,
+        error,
+      );
       // Continue with other chunks instead of failing completely
     }
   }
 
-  console.log(`Synced ${successfulChunks}/${chunked.length} chunks (${query.length} courses total) to Algolia for semester ${semester}`);
+  console.log(
+    `Synced ${successfulChunks}/${chunked.length} chunks (${query.length} courses total) to Algolia for semester ${semester}`,
+  );
 };
 
-export const exportCoursesToAlgoliaFile = async (env: Env, semester: string) => {
+export const exportCoursesToAlgoliaFile = async (
+  env: Env,
+  semester: string,
+) => {
   console.log(`Starting Algolia data export for semester ${semester}...`);
 
   const query = await retryWithBackoff(
@@ -837,7 +882,7 @@ export const exportCoursesToAlgoliaFile = async (env: Env, semester: string) => 
     },
     3,
     2000,
-    "course data fetch for Algolia export"
+    "course data fetch for Algolia export",
   );
 
   // Transform data to Algolia format
@@ -857,20 +902,22 @@ export const exportCoursesToAlgoliaFile = async (env: Env, semester: string) => 
       semester: semester,
       exportDate: new Date().toISOString(),
       totalCourses: algoliaData.length,
-      version: "1.0"
+      version: "1.0",
     },
-    courses: algoliaData
+    courses: algoliaData,
   };
 
   const jsonContent = JSON.stringify(exportData, null, 2);
-  const fileName = `algolia-courses-${semester}-${new Date().toISOString().split('T')[0]}.json`;
+  const fileName = `algolia-courses-${semester}-${new Date().toISOString().split("T")[0]}.json`;
 
   // Upload to Supabase storage
   const uploadResult = await retryWithBackoff(
     async () => {
-      const { data, error } = await supabaseWithEnv(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
-        .storage
-        .from("algolia-backups")
+      const { data, error } = await supabaseWithEnv(
+        env.SUPABASE_URL,
+        env.SUPABASE_SERVICE_ROLE_KEY,
+      )
+        .storage.from("algolia-backups")
         .upload(fileName, jsonContent, {
           cacheControl: (60 * 60 * 24 * 7).toString(), // cache for 7 days
           upsert: true,
@@ -882,13 +929,15 @@ export const exportCoursesToAlgoliaFile = async (env: Env, semester: string) => 
     },
     3,
     1500,
-    `Algolia backup upload ${fileName}`
+    `Algolia backup upload ${fileName}`,
   );
 
   // Get the public URL
-  const { data: publicUrlData } = supabaseWithEnv(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
-    .storage
-    .from("algolia-backups")
+  const { data: publicUrlData } = supabaseWithEnv(
+    env.SUPABASE_URL,
+    env.SUPABASE_SERVICE_ROLE_KEY,
+  )
+    .storage.from("algolia-backups")
     .getPublicUrl(fileName);
 
   console.log(`Algolia export completed: ${algoliaData.length} courses`);
@@ -903,20 +952,25 @@ export const exportCoursesToAlgoliaFile = async (env: Env, semester: string) => 
     stats: {
       totalCourses: algoliaData.length,
       fileSize: jsonContent.length,
-      fileSizeKB: Math.round(jsonContent.length / 1024)
+      fileSizeKB: Math.round(jsonContent.length / 1024),
     },
-    storageInfo: uploadResult
+    storageInfo: uploadResult,
   };
 };
 
-export const uploadAlgoliaFileToStorage = async (env: Env, semester: string) => {
+export const uploadAlgoliaFileToStorage = async (
+  env: Env,
+  semester: string,
+) => {
   console.log(`Creating Algolia backup for semester ${semester}...`);
 
   // Use the main export function which now saves directly to storage
   const result = await exportCoursesToAlgoliaFile(env, semester);
 
   console.log(`Successfully created Algolia backup: ${result.fileName}`);
-  console.log(`Backup contains ${result.stats.totalCourses} courses (${result.stats.fileSizeKB}KB)`);
+  console.log(
+    `Backup contains ${result.stats.totalCourses} courses (${result.stats.fileSizeKB}KB)`,
+  );
   console.log(`Public URL: ${result.publicUrl}`);
 
   return result;
@@ -928,9 +982,11 @@ export const restoreAlgoliaFromFile = async (env: Env, fileName: string) => {
   // Download the JSON file from storage
   const fileData = await retryWithBackoff(
     async () => {
-      const { data, error } = await supabaseWithEnv(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
-        .storage
-        .from("algolia-backups")
+      const { data, error } = await supabaseWithEnv(
+        env.SUPABASE_URL,
+        env.SUPABASE_SERVICE_ROLE_KEY,
+      )
+        .storage.from("algolia-backups")
         .download(fileName);
 
       if (error) throw new Error(`Storage download error: ${error.message}`);
@@ -940,7 +996,7 @@ export const restoreAlgoliaFromFile = async (env: Env, fileName: string) => {
     },
     3,
     2000,
-    `Algolia backup download ${fileName}`
+    `Algolia backup download ${fileName}`,
   );
 
   // Parse the JSON content
@@ -955,12 +1011,15 @@ export const restoreAlgoliaFromFile = async (env: Env, fileName: string) => {
   console.log(`Backup metadata:`, exportData.metadata);
 
   // Split into chunks for Algolia upload
-  const chunked = exportData.courses.reduce((acc: any[][], cur: any, i: number) => {
-    const index = Math.floor(i / 500);
-    acc[index] = acc[index] || [];
-    acc[index].push(cur);
-    return acc;
-  }, []);
+  const chunked = exportData.courses.reduce(
+    (acc: any[][], cur: any, i: number) => {
+      const index = Math.floor(i / 500);
+      acc[index] = acc[index] || [];
+      acc[index].push(cur);
+      return acc;
+    },
+    [],
+  );
 
   let successfulChunks = 0;
   let totalUploaded = 0;
@@ -969,25 +1028,36 @@ export const restoreAlgoliaFromFile = async (env: Env, fileName: string) => {
     try {
       await retryWithBackoff(
         async () => {
-          const { taskIDs } = await algoliaWithEnv(env.ALGOLIA_APP_ID, env.ALGOLIA_API_KEY)
-            .saveObjects(chunk);
-          console.log(`Restored ${chunk.length} courses to Algolia, taskID: ${taskIDs}`);
+          const { taskIDs } = await algoliaWithEnv(
+            env.ALGOLIA_APP_ID,
+            env.ALGOLIA_API_KEY,
+          ).saveObjects(chunk);
+          console.log(
+            `Restored ${chunk.length} courses to Algolia, taskID: ${taskIDs}`,
+          );
         },
         3,
         2000,
-        `Algolia restore chunk ${successfulChunks + 1}/${chunked.length}`
+        `Algolia restore chunk ${successfulChunks + 1}/${chunked.length}`,
       );
 
       successfulChunks++;
       totalUploaded += chunk.length;
     } catch (error) {
-      console.error(`Error restoring chunk ${successfulChunks + 1}/${chunked.length} to Algolia:`, error);
+      console.error(
+        `Error restoring chunk ${successfulChunks + 1}/${chunked.length} to Algolia:`,
+        error,
+      );
       // Continue with other chunks instead of failing completely
     }
   }
 
-  console.log(`Algolia restore completed: ${totalUploaded}/${exportData.courses.length} courses restored`);
-  console.log(`Successfully processed ${successfulChunks}/${chunked.length} chunks`);
+  console.log(
+    `Algolia restore completed: ${totalUploaded}/${exportData.courses.length} courses restored`,
+  );
+  console.log(
+    `Successfully processed ${successfulChunks}/${chunked.length} chunks`,
+  );
 
   return {
     success: true,
@@ -995,31 +1065,41 @@ export const restoreAlgoliaFromFile = async (env: Env, fileName: string) => {
     coursesRestored: totalUploaded,
     chunksProcessed: successfulChunks,
     totalChunks: chunked.length,
-    metadata: exportData.metadata
+    metadata: exportData.metadata,
   };
 };
 
 export const listAlgoliaBackups = async (env: Env) => {
   console.log("Listing available Algolia backup files...");
 
-  const { data, error } = await supabaseWithEnv(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
-    .storage
-    .from("algolia-backups")
+  const { data, error } = await supabaseWithEnv(
+    env.SUPABASE_URL,
+    env.SUPABASE_SERVICE_ROLE_KEY,
+  )
+    .storage.from("algolia-backups")
     .list();
 
   if (error) {
     throw new Error(`Storage list error: ${error.message}`);
   }
 
-  const backups = data
-    ?.filter(file => file.name.endsWith('.json') && file.name.includes('algolia-backup'))
-    ?.map(file => ({
-      name: file.name,
-      size: file.metadata?.size || 0,
-      lastModified: file.updated_at,
-      sizeKB: Math.round((file.metadata?.size || 0) / 1024)
-    }))
-    ?.sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()) || [];
+  const backups =
+    data
+      ?.filter(
+        (file) =>
+          file.name.endsWith(".json") && file.name.includes("algolia-backup"),
+      )
+      ?.map((file) => ({
+        name: file.name,
+        size: file.metadata?.size || 0,
+        lastModified: file.updated_at,
+        sizeKB: Math.round((file.metadata?.size || 0) / 1024),
+      }))
+      ?.sort(
+        (a, b) =>
+          new Date(b.lastModified).getTime() -
+          new Date(a.lastModified).getTime(),
+      ) || [];
 
   console.log(`Found ${backups.length} Algolia backup files`);
   return backups;
