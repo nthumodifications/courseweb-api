@@ -11,6 +11,12 @@ type GithubEnv = {
   TURNSTILE_SECRET_KEY: string;
 };
 
+type ErrorResponse = {
+  error: string;
+  code?: string;
+  details?: string;
+};
+
 type GithubIssue = {
   url: string;
   repository_url: string;
@@ -169,35 +175,129 @@ const app = new Hono()
           TURNSTILE_SECRET_KEY,
         );
         if (!isValid) {
-          return c.json({ error: "Invalid Turnstile verification" }, 400);
+          return c.json(
+            {
+              error: "Invalid Turnstile verification",
+              code: "TURNSTILE_VERIFICATION_FAILED",
+              details: "Please refresh the page and try again",
+            } as ErrorResponse,
+            400,
+          );
         }
+      }
+
+      // Validate input
+      if (!title || title.length < 7) {
+        return c.json(
+          {
+            error: "Title is required and must be at least 7 characters long",
+            code: "INVALID_TITLE",
+          } as ErrorResponse,
+          400,
+        );
+      }
+
+      if (!body || body.trim().length < 10) {
+        return c.json(
+          {
+            error:
+              "Description is required and must be at least 10 characters long",
+            code: "INVALID_DESCRIPTION",
+          } as ErrorResponse,
+          400,
+        );
       }
 
       // base64 encoded private key to utf8, not using buffer
       const privateKey = atob(GITHUB_APP_PRIVATE_KEY);
 
-      const accessToken = await getInstallationAccessToken(
-        GITHUB_CLIENT_ID,
-        privateKey,
-        GITHUB_INSTALLATION_ID,
-      );
+      let accessToken: string;
+      try {
+        accessToken = await getInstallationAccessToken(
+          GITHUB_CLIENT_ID,
+          privateKey,
+          GITHUB_INSTALLATION_ID,
+        );
+      } catch (error) {
+        console.error("Failed to get GitHub access token:", error);
+        return c.json(
+          {
+            error: "Failed to authenticate with GitHub",
+            code: "GITHUB_AUTH_FAILED",
+            details: "Please try again later",
+          } as ErrorResponse,
+          500,
+        );
+      }
       const repoOwner = "nthumodifications";
       const repoName = "courseweb";
 
-      const response = await fetch(
-        `https://api.github.com/repos/${repoOwner}/${repoName}/issues`,
-        {
-          method: "POST",
-          headers: {
-            "User-Agent": "nthumods-app",
-            Authorization: `token ${accessToken}`,
-            Accept: "application/vnd.github.v3+json",
+      try {
+        const response = await fetch(
+          `https://api.github.com/repos/${repoOwner}/${repoName}/issues`,
+          {
+            method: "POST",
+            headers: {
+              "User-Agent": "nthumods-app",
+              Authorization: `token ${accessToken}`,
+              Accept: "application/vnd.github.v3+json",
+            },
+            body: JSON.stringify({ title, body, labels }),
           },
-          body: JSON.stringify({ title, body, labels }),
-        },
-      );
-      const data = (await response.json()) as GithubIssue;
-      return c.json(data);
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`GitHub API error: ${response.status} ${errorText}`);
+
+          let errorResponse: ErrorResponse;
+
+          switch (response.status) {
+            case 401:
+              errorResponse = {
+                error: "Authentication failed with GitHub",
+                code: "GITHUB_AUTH_INVALID",
+                details: "Please refresh and try again",
+              };
+              break;
+            case 403:
+              errorResponse = {
+                error: "Access denied by GitHub",
+                code: "GITHUB_ACCESS_DENIED",
+                details: "Rate limit exceeded or insufficient permissions",
+              };
+              break;
+            case 422:
+              errorResponse = {
+                error: "Invalid issue data",
+                code: "GITHUB_VALIDATION_ERROR",
+                details: "The issue data was rejected by GitHub",
+              };
+              break;
+            default:
+              errorResponse = {
+                error: "Failed to create GitHub issue",
+                code: "GITHUB_API_ERROR",
+                details: `HTTP ${response.status}: ${response.statusText}`,
+              };
+          }
+
+          return c.json(errorResponse, response.status as any);
+        }
+
+        const data = (await response.json()) as GithubIssue;
+        return c.json(data);
+      } catch (error) {
+        console.error("Error creating GitHub issue:", error);
+        return c.json(
+          {
+            error: "Failed to submit issue",
+            code: "NETWORK_ERROR",
+            details: "Please check your connection and try again",
+          } as ErrorResponse,
+          500,
+        );
+      }
     },
   )
   .get(
@@ -210,6 +310,18 @@ const app = new Hono()
     ),
     async (c) => {
       const { tag } = c.req.valid("query");
+
+      // Validate tag parameter
+      if (!tag || tag.trim().length === 0) {
+        return c.json(
+          {
+            error: "Tag parameter is required",
+            code: "MISSING_TAG",
+          } as ErrorResponse,
+          400,
+        );
+      }
+
       const {
         GITHUB_CLIENT_ID,
         GITHUB_APP_PRIVATE_KEY,
@@ -217,27 +329,111 @@ const app = new Hono()
       } = env<GithubEnv>(c);
       const privateKey = atob(GITHUB_APP_PRIVATE_KEY);
 
-      const accessToken = await getInstallationAccessToken(
-        GITHUB_CLIENT_ID,
-        privateKey,
-        GITHUB_INSTALLATION_ID,
-      );
+      let accessToken: string;
+      try {
+        accessToken = await getInstallationAccessToken(
+          GITHUB_CLIENT_ID,
+          privateKey,
+          GITHUB_INSTALLATION_ID,
+        );
+      } catch (error) {
+        console.error("Failed to get GitHub access token for GET:", error);
+        return c.json(
+          {
+            error: "Failed to authenticate with GitHub",
+            code: "GITHUB_AUTH_FAILED",
+            details: "Please try again later",
+          } as ErrorResponse,
+          500,
+        );
+      }
+
       const repoOwner = "nthumodifications";
       const repoName = "courseweb";
 
-      const response = await fetch(
-        `https://api.github.com/repos/${repoOwner}/${repoName}/issues?filter=all&labels=${tag}&state=open`,
-        {
-          method: "GET",
-          headers: {
-            "User-Agent": "nthumods-app",
-            Authorization: `token ${accessToken}`,
-            Accept: "application/vnd.github.v3+json",
+      try {
+        const response = await fetch(
+          `https://api.github.com/repos/${repoOwner}/${repoName}/issues?filter=all&labels=${encodeURIComponent(tag)}&state=open`,
+          {
+            method: "GET",
+            headers: {
+              "User-Agent": "nthumods-app",
+              Authorization: `token ${accessToken}`,
+              Accept: "application/vnd.github.v3+json",
+            },
           },
-        },
-      );
-      const data = (await response.json()) as GithubIssue[];
-      return c.json(data);
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(
+            `GitHub API GET error: ${response.status} ${errorText}`,
+          );
+
+          let errorResponse: ErrorResponse;
+
+          switch (response.status) {
+            case 401:
+              errorResponse = {
+                error: "Authentication failed with GitHub",
+                code: "GITHUB_AUTH_INVALID",
+                details: "Please refresh and try again",
+              };
+              break;
+            case 403:
+              errorResponse = {
+                error: "Access denied by GitHub",
+                code: "GITHUB_ACCESS_DENIED",
+                details: "Rate limit exceeded or insufficient permissions",
+              };
+              break;
+            case 404:
+              errorResponse = {
+                error: "Repository not found",
+                code: "GITHUB_REPO_NOT_FOUND",
+                details: "The repository may have been moved or deleted",
+              };
+              break;
+            default:
+              errorResponse = {
+                error: "Failed to fetch issues from GitHub",
+                code: "GITHUB_API_ERROR",
+                details: `HTTP ${response.status}: ${response.statusText}`,
+              };
+          }
+
+          return c.json(
+            errorResponse,
+            (response.status >= 500 ? 500 : response.status) as any,
+          );
+        }
+
+        const data = (await response.json()) as GithubIssue[];
+
+        // Validate response data
+        if (!Array.isArray(data)) {
+          return c.json(
+            {
+              error: "Invalid response from GitHub",
+              code: "INVALID_GITHUB_RESPONSE",
+              details: "Expected an array of issues",
+            } as ErrorResponse,
+            502,
+          );
+        }
+
+        return c.json(data);
+      } catch (error) {
+        console.error("Error fetching GitHub issues:", error);
+        return c.json(
+          {
+            error: "Failed to fetch issues",
+            code: "NETWORK_ERROR",
+            details: "Please check your connection and try again",
+          } as ErrorResponse,
+          500,
+        );
+      }
     },
   );
 
